@@ -1,0 +1,28 @@
+{
+  "name": "cline-bulk-apikey",
+  "version": "1.0.0",
+  "description": "Bulk-create Cline API keys (workos bearer) — 9Router connector",
+  "main": "src/cli.js",
+  "bin": {
+    "cline-bulk": "src/cli.js"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "9router",
+    "cline",
+    "api-keys",
+    "bulk",
+    "openai-compatible"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/F0Rextasy/cline-bulk-apikey"
+  },
+  "scripts": {
+    "test": "node src/cli.js --help"
+  }
+}

@@ -15,7 +15,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-
+import { showBanner } from './launcher.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const BASE = (process.env.CLINE_API || 'https://api.cline.bot').replace(/\/$/, '');
@@ -364,6 +364,7 @@ Environment:
 async function run() {
   const cmd = process.argv[2];
   if (!cmd || cmd === '--help' || cmd === '-h' || cmd === 'help') {
+    showBanner();
     console.log(HELP);
     return;
   }

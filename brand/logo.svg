@@ -1,3 +1,58 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 50">
-  <text x="10" y="38" font-family="monospace" font-size="32" fill="#10a37f">CLINE</text>
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="cline-bulk logo">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0B1418"/>
+      <stop offset="1" stop-color="#0F2A24"/>
+    </linearGradient>
+    <linearGradient id="cline" x1="96" y1="80" x2="318" y2="262" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3DDC97"/>
+      <stop offset="0.55" stop-color="#22D3EE"/>
+      <stop offset="1" stop-color="#10A37F"/>
+    </linearGradient>
+    <linearGradient id="key" x1="272" y1="288" x2="424" y2="384" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5B9DFF"/>
+      <stop offset="1" stop-color="#22D3EE"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="9" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect x="24" y="24" width="464" height="464" rx="92" stroke="#3DDC97" stroke-opacity="0.22" stroke-width="2"/>
+
+  <!-- a stack of identical keys: one minted per key in the batch -->
+  <g transform="translate(70 80)" stroke="url(#cline)" stroke-width="16" stroke-linecap="round" fill="none">
+    <g opacity="0.35" transform="translate(0 0)">
+      <circle cx="40" cy="40" r="30"/>
+      <rect x="64" y="32" width="120" height="16" rx="8"/>
+      <rect x="118" y="48" width="14" height="26" rx="6"/>
+      <rect x="158" y="48" width="14" height="20" rx="6"/>
+    </g>
+    <g opacity="0.65" transform="translate(34 50)">
+      <circle cx="40" cy="40" r="30"/>
+      <rect x="64" y="32" width="120" height="16" rx="8"/>
+      <rect x="118" y="48" width="14" height="26" rx="6"/>
+      <rect x="158" y="48" width="14" height="20" rx="6"/>
+    </g>
+    <g transform="translate(68 100)">
+      <circle cx="40" cy="40" r="30"/>
+      <rect x="64" y="32" width="120" height="16" rx="8"/>
+      <rect x="118" y="48" width="14" height="26" rx="6"/>
+      <rect x="158" y="48" width="14" height="20" rx="6"/>
+    </g>
+  </g>
+
+  <!-- arrow into the router -->
+  <path d="M330 88h70m0 0-22-22m22 22-22 22" stroke="url(#cline)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- the minted key, handed to 9Router -->
+  <g transform="translate(272 288)" filter="url(#glow)">
+    <rect x="0" y="0" width="152" height="96" rx="26" fill="url(#key)"/>
+    <circle cx="42" cy="48" r="17" fill="none" stroke="#06121B" stroke-width="9"/>
+    <rect x="64" y="40" width="62" height="16" rx="8" fill="#06121B"/>
+    <rect x="100" y="40" width="12" height="30" rx="5" fill="#06121B"/>
+    <rect x="122" y="40" width="12" height="22" rx="5" fill="#06121B"/>
+  </g>
 </svg>

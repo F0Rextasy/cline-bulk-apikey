@@ -1,9 +1,11 @@
 #!/usr/bin/env node
-'use strict';
 
 /**
  * Cline ASCII banner launcher.
  * Shows the Cline logo when the CLI is invoked.
+ *
+ * ESM: this package is `"type": "module"`, so CommonJS `module.exports`
+ * here would make the file unloadable by `src/cli.js`.
  */
 
 const CLINE_BANNER = `
@@ -51,8 +53,8 @@ function showCompact() {
   console.log('  C L I N E   b u l k - a p i k e y');
 }
 
-module.exports = { showBanner, showCompact, CLINE_BANNER };
+export { showBanner, showCompact, CLINE_BANNER };
 
-if (require.main === module) {
+if (process.argv[1] && process.argv[1].endsWith('launcher.js')) {
   showBanner();
 }

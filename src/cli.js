@@ -326,16 +326,7 @@ async function cmdConnect() {
   console.log(`   Client key: ${clientKey}`);
 }
 
-const cmd = process.argv[2];
-(async () => {
-  if (cmd === 'auth') return cmdAuth();
-  if (cmd === 'list') return cmdList();
-  if (cmd === 'create') return cmdCreate();
-  if (cmd === 'delete') return cmdDelete();
-  if (cmd === 'verify') return cmdVerify();
-  if (cmd === 'connect') return cmdConnect();
-  if (!cmd) {
-    console.log(`cline-bulk — bulk-create Cline API keys (workos bearer) — 9Router connector
+const HELP = `cline-bulk — bulk-create Cline API keys (workos bearer) — 9Router connector
 
 Usage:
   cline-bulk auth                      # check account + balance
@@ -348,23 +339,51 @@ Usage:
 Options:
   --count <n>          number of keys to create (default: 200)
   --prefix <p>         key name prefix (default: clx)
-  --out <file>         output keys file
-  --model <id>         model for verification
+  --start <n>          first index of the batch (default: 1)
+  --out <file>         output keys file (default: out/cline-keys.txt)
+  --model <id>         model for verification (default: auto-probe)
   --conc <n>           concurrency for verify (default: 6)
-  --delay <ms>         delay between creates (default: 160ms)
-  --keys <file>        keys file for connect (default: out/cline-keys.txt)
+  --retries <n>        retries per verification call (default: 3)
+  --limit <n>          verify only the first n keys (default: all)
+  --delay <ms>         delay between creates (default: 160)
+  --keys <file>        keys file for verify/connect (default: out/cline-keys.txt)
+  --name <n>           delete the key with this name
+  --id <id>            delete the key with this id
+  --all                with delete, target every key
+  --yes                confirm a delete
+  --force              force a token refresh for auth
   --router <url>       9Router URL (default: http://localhost:20128)
   --router-password    9Router password (default: 123456)
+  --help, -h           print this help
 
 Environment:
   CLINE_API            Cline API base (default: https://api.cline.bot)
   CLINE_REFRESH_TOKEN  WorkOS refresh token
-`);
-    process.exit(0);
+`;
+
+async function run() {
+  const cmd = process.argv[2];
+  if (!cmd || cmd === '--help' || cmd === '-h' || cmd === 'help') {
+    console.log(HELP);
+    return;
   }
-  console.log('unknown command:', cmd);
+  if (cmd === 'auth') return cmdAuth();
+  if (cmd === 'list') return cmdList();
+  if (cmd === 'create') return cmdCreate();
+  if (cmd === 'delete') return cmdDelete();
+  if (cmd === 'verify') return cmdVerify();
+  if (cmd === 'connect') return cmdConnect();
+  console.error('unknown command:', cmd);
+  console.error('run `cline-bulk --help` for the usage block');
   process.exitCode = 1;
-})().catch((e) => {
-  console.error('FATAL', e.stack || e.message);
-  process.exitCode = 1;
-});
+}
+
+export { cmdCreate, writeKeysFile, cmdVerify, cmdList, cmdDelete, HELP };
+
+// Run the CLI only when invoked directly, so examples can import the commands.
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  run().catch((e) => {
+    console.error('FATAL', e.stack || e.message);
+    process.exitCode = 1;
+  });
+}

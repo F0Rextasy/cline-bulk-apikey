@@ -46,7 +46,7 @@ Cline mints API keys through its own plain HTTPS JSON API — one `POST` per key
 > 💡 The free tier is set by Cline and can change. Check the live numbers at [cline.bot](https://cline.bot) — and let the tool's own gate decide:
 
 ```bash
-node src/cli.js --verify-only     # every key in keys.txt is re-tested with a real chat call
+node src/cli.js verify           # every key in keys.txt is re-tested with a real chat call
 ```
 
 ## 🤖 Models — all 2 of them

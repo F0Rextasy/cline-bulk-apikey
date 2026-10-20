@@ -16,6 +16,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { showBanner } from './launcher.js';
+import { readKeysFile } from './connect-9router.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const BASE = (process.env.CLINE_API || 'https://api.cline.bot').replace(/\/$/, '');
@@ -47,9 +48,9 @@ function writeStoredAuth(obj) {
   fs.writeFileSync(AUTH_FILE, JSON.stringify({ ...obj, saved_at: new Date().toISOString() }, null, 1));
 }
 
-function refreshTokenFrom9Router() {
+async function refreshTokenFrom9Router() {
   try {
-    const { DatabaseSync } = require('node:sqlite');
+    const { DatabaseSync } = await import('node:sqlite');
     const db = new DatabaseSync(path.join(process.env.APPDATA || '', '9router', 'db', 'data.sqlite'), { readOnly: true });
     const row = db.prepare("SELECT data FROM providerConnections WHERE provider LIKE '%cline%' ORDER BY updatedAt DESC LIMIT 1").get();
     db.close();
@@ -64,7 +65,7 @@ function refreshTokenFrom9Router() {
 
 async function refresh() {
   const stored = readStoredAuth();
-  const rt = stored?.refresh_token || process.env.CLINE_REFRESH_TOKEN || refreshTokenFrom9Router();
+  const rt = stored?.refresh_token || process.env.CLINE_REFRESH_TOKEN || (await refreshTokenFrom9Router());
   if (!rt) throw new Error('no refresh token: neither out/.cline-auth.json nor the 9Router DB has one');
   const res = await fetch(`${WORKOS_BASE}/authenticate`, {
     method: 'POST',
@@ -124,7 +125,7 @@ async function api(method, p, body) {
       console.error('  401 → refreshing account token and retrying once');
       continue;
     }
-    return { status: res.status, json, text, headers: res.headers };
+    return { status: res.status, json, text };
   }
   throw new Error('unreachable');
 }
@@ -153,6 +154,10 @@ async function cmdCreate() {
   const count = Number(arg('count', '200'));
   const prefix = arg('prefix', 'clx');
   const start = Number(arg('start', '1'));
+
+  for (const [n, v] of [['count', count], ['start', start]]) {
+    if (!Number.isInteger(v) || v < 1) throw new Error(`--${n} must be a positive integer`);
+  }
   const delay = Number(arg('delay', '160'));
   const out = arg('out', path.join(OUT_DIR, 'cline-keys.txt'));
   const jl = out.replace(/\.txt$/, '') + '.jsonl';
@@ -199,14 +204,20 @@ async function cmdCreate() {
 }
 
 function writeKeysFile(out, base, created, failures) {
+  // Merge with what is already on disk: a later batch extends the file instead of
+  // replacing it (a run that minted nothing used to wipe every key already minted).
+  const keys = created.map((c) => c.key);
+  const seen = new Set(keys);
+  if (fs.existsSync(out)) {
+    for (const k of readKeysFile(out)) if (!seen.has(k)) { seen.add(k); keys.push(k); }
+  }
   const head = [
     `# Cline API keys · rotated ${new Date().toISOString()}`,
-    `# created ${created.length} · base ${base} · model list ${base}/models`,
+    `# keys ${keys.length} · base ${base} · model list ${base}/models`,
     `# tool: cline-bulk (create|list|delete|verify)`,
   ];
-  const body = created.map((c) => c.key);
   fs.mkdirSync(path.dirname(out), { recursive: true });
-  fs.writeFileSync(out, [...head, ...body, ''].join('\n'));
+  fs.writeFileSync(out, [...head, ...keys, ''].join('\n'));
   if (failures.length) console.error(`${failures.length} failure(s) recorded`);
 }
 
@@ -258,11 +269,12 @@ async function chat(key, model) {
 async function cmdVerify() {
   const file = arg('keys', path.join(OUT_DIR, 'cline-keys.txt'));
   const out = arg('out', file.replace(/\.txt$/, '') + '.verify.txt');
-  const conc = Number(arg('conc', '6'));
+  const conc = Number(arg('conc', '6')) || 1;
   const retries = Number(arg('retries', '3'));
   const gap = Number(arg('delay', '0'));
   const limit = Number(arg('limit', '0')) || Infinity;
-  const keys = fs.readFileSync(file, 'utf8').split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#')).map((l) => l.split(/[\s,]+/)[0]).slice(0, limit);
+  const keys = readKeysFile(file).slice(0, limit);
+  if (!keys.length) throw new Error(`no keys in ${file}`);
   let model = arg('model');
   if (!model) {
     for (const m of VERIFY_FALLBACKS) {
@@ -282,7 +294,7 @@ async function cmdVerify() {
       let r = { status: 'net', err: 'not attempted', sample: '' };
       for (let attempt = 0; attempt <= retries; attempt++) {
         try { r = await chat(k, model); } catch (e) { r = { status: 'net', err: e.message, sample: '' }; }
-        if (![429, 500, 502, 503, 504].includes(Number(r.status)) || attempt === retries) break;
+        if (!(r.status === 'net' || [429, 500, 502, 503, 504].includes(r.status)) || attempt === retries) break;
         await sleep(2000 * (attempt + 1));
       }
       results[my] = { i: my + 1, prefix: k.slice(0, 16), ...r };

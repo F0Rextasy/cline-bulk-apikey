@@ -9,7 +9,18 @@
  * 9Router: npm install -g 9router && 9router  # dashboard http://localhost:20128
  */
 
+import fs from 'node:fs';
+
 const UA = 'cline-bulk-9router/1.0';
+
+/** One `sk-…` per line; `#` lines are comments; a trailing name/prefix column is dropped. */
+function readKeysFile(file) {
+  return fs.readFileSync(file, 'utf8')
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('#'))
+    .map((l) => l.split(/[\s,]+/)[0]);
+}
 
 async function login(base, password) {
   const res = await fetch(`${base}/api/auth/login`, {
@@ -51,7 +62,10 @@ async function ensureProviderNode(base, cookie, { name, prefix, baseUrl }) {
   return { node: created.json.node, created: true };
 }
 
-async function ensureConnection(base, cookie, { nodeId, name, apiKey, defaultModel }) {
+async function ensureConnection(base, cookie, { nodeId, name, apiKey, defaultModel, known }) {
+  // `known` is a snapshot of `${provider}|${name}` taken once by the caller, so a
+  // bulk run does not re-list every connection for every key.
+  if (known && known.has(`${nodeId}|${name}`)) return { connection: null, created: false };
   const list = await apiCall(base, cookie, '/api/providers');
   const conns = (list.json && list.json.connections) || [];
   const existing = conns.find((c) => c.provider === nodeId && c.name === name);
@@ -63,6 +77,7 @@ async function ensureConnection(base, cookie, { nodeId, name, apiKey, defaultMod
   if (!created.ok && created.status !== 409) {
     throw new Error(`create connection failed ${created.status}: ${created.text}`);
   }
+  if (known) known.add(`${nodeId}|${name}`);
   return { connection: created.json && created.json.connection, created: true };
 }
 
@@ -107,22 +122,21 @@ async function connectBulk({
   prefix = 'cline',
   defaultModel = 'poolside/laguna-s-2.1:free',
 }) {
-  const fs = require('fs');
-  const keys = fs.readFileSync(keysFile, 'utf8')
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l && !l.startsWith('#'))
-    .map((l) => l.split(/[\s,]+/)[0]);
+  const keys = readKeysFile(keysFile);
 
   console.log(`connecting ${keys.length} keys to 9Router at ${base}`);
   const results = [];
   
-  const { cookie } = await login(base, password);
+  const { cookie, ok, body } = await login(base, password);
+  if (!ok) throw new Error(`9Router login failed: ${body}`);
   const { node } = await ensureProviderNode(base, cookie, { 
     name: 'Cline', 
     prefix, 
     baseUrl: 'https://api.cline.bot/api/v1' 
   });
+
+  const list = await apiCall(base, cookie, '/api/providers');
+  const known = new Set(((list.json && list.json.connections) || []).map((c) => `${c.provider}|${c.name}`));
 
   for (let i = 0; i < keys.length; i++) {
     const key = keys[i];
@@ -133,6 +147,7 @@ async function connectBulk({
         name,
         apiKey: key,
         defaultModel,
+        known,
       });
       results.push({ i: i + 1, key: key.slice(0, 16) + '…', connectionId: connection?.id, created });
       console.log(`  [${i + 1}/${keys.length}] ${name} → ${created ? 'created' : 'exists'}`);
@@ -160,7 +175,7 @@ async function listRouterModels(base, clientKey, { filter = 'cline/' } = {}) {
   return filter ? ids.filter((id) => id.includes(filter)) : ids;
 }
 
-module.exports = {
+export {
   login,
   apiCall,
   ensureProviderNode,
@@ -169,5 +184,6 @@ module.exports = {
   connect,
   connectBulk,
   listRouterModels,
+  readKeysFile,
   UA,
 };

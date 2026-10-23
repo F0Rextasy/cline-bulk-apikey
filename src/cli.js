@@ -151,10 +151,6 @@ async function cmdCreate() {
   const count = Number(arg('count', '200'));
   const prefix = arg('prefix', 'clx');
   const start = Number(arg('start', '1'));
-
-  for (const [n, v] of [['count', count], ['start', start]]) {
-    if (!Number.isInteger(v) || v < 1) throw new Error(`--${n} must be a positive integer`);
-  }
   const delay = Number(arg('delay', '160'));
   const out = arg('out', path.join(OUT_DIR, 'cline-keys.txt'));
   const jl = out.replace(/\.txt$/, '') + '.jsonl';
@@ -200,31 +196,15 @@ async function cmdCreate() {
   return created;
 }
 
-function readKeyLines(file) {
-  if (!fs.existsSync(file)) return [];
-  return fs
-    .readFileSync(file, 'utf8')
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l && !l.startsWith('#'))
-    .map((l) => l.split(/[\s,]+/)[0]);
-}
-
 function writeKeysFile(out, base, created, failures) {
-  // Merge with what is already on disk: a later batch extends the file instead of
-  // replacing it (a run that minted nothing used to wipe every key already minted).
-  const keys = created.map((c) => c.key);
-  const seen = new Set(keys);
-  if (fs.existsSync(out)) {
-    for (const k of readKeyLines(out)) if (!seen.has(k)) { seen.add(k); keys.push(k); }
-  }
   const head = [
     `# Cline API keys · rotated ${new Date().toISOString()}`,
-    `# keys ${keys.length} · base ${base} · model list ${base}/models`,
+    `# created ${created.length} · base ${base} · model list ${base}/models`,
     `# tool: cline-bulk (create|list|delete|verify)`,
   ];
+  const body = created.map((c) => c.key);
   fs.mkdirSync(path.dirname(out), { recursive: true });
-  fs.writeFileSync(out, [...head, ...keys, ''].join('\n'));
+  fs.writeFileSync(out, [...head, ...body, ''].join('\n'));
   if (failures.length) console.error(`${failures.length} failure(s) recorded`);
 }
 
@@ -276,12 +256,11 @@ async function chat(key, model) {
 async function cmdVerify() {
   const file = arg('keys', path.join(OUT_DIR, 'cline-keys.txt'));
   const out = arg('out', file.replace(/\.txt$/, '') + '.verify.txt');
-  const conc = Number(arg('conc', '6')) || 1;
+  const conc = Number(arg('conc', '6'));
   const retries = Number(arg('retries', '3'));
   const gap = Number(arg('delay', '0'));
   const limit = Number(arg('limit', '0')) || Infinity;
-  const keys = readKeyLines(file).slice(0, limit);
-  if (!keys.length) throw new Error(`no keys in ${file}`);
+  const keys = fs.readFileSync(file, 'utf8').split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#')).map((l) => l.split(/[\s,]+/)[0]).slice(0, limit);
   let model = arg('model');
   if (!model) {
     for (const m of VERIFY_FALLBACKS) {
@@ -325,18 +304,24 @@ async function cmdVerify() {
 }
 
 async function cmdConnect() {
-  const { connectKeysFile, connect9Router, defaultKeysFile } = require('./connect-9router.js');
-  const keysFile = arg('keys', defaultKeysFile());
+  const { connectBulk } = await import('./connect-9router.js');
+  const keysFile = arg('keys', path.join(OUT_DIR, 'cline-keys.txt'));
   const router = arg('router', 'http://localhost:20128');
   const password = arg('router-password', '123456');
   const prefix = arg('prefix', 'cline');
   const model = arg('model', 'poolside/laguna-s-2.1:free');
-  const opts = { base: router, password, prefix, defaultModel: model };
-  console.log(`connecting to 9Router at ${router} …`);
-  const single = arg('api-key');
-  if (single) await connect9Router({ ...opts, apiKey: single });
-  else await connectKeysFile({ ...opts, keysFile });
-  console.log(`\n✅ keys registered with 9Router as <${prefix}/model> — endpoint ${router}/v1`);
+  
+  const { clientKey, results } = await connectBulk({
+    base: router,
+    password,
+    keysFile,
+    prefix,
+    defaultModel: model,
+  });
+  
+  console.log(`\n✅ Connected ${results.filter(r => !r.error).length} keys to 9Router`);
+  console.log(`   Endpoint: ${router}/v1`);
+  console.log(`   Client key: ${clientKey}`);
 }
 
 const HELP = `cline-bulk — bulk-create Cline API keys (workos bearer) — 9Router connector

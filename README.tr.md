@@ -1,7 +1,6 @@
 <div align="center">
 
 ```
-
  ██████╗██╗     ██╗███╗   ██╗███████╗
 ██╔════╝██║     ██║████╗  ██║██╔════╝
 ██║     ██║     ██║██╔██╗ ██║█████╗
@@ -12,7 +11,7 @@
 
 # cline-bulk-apikey
 
-**Cline API anahtarlarını Cline'in kendi API'si (workos bearer) üzerinden toplu oluşturun ve her anahtarı 9Router'a kaydedin — OpenAI uyumlu çıkarım + 9Router bağlayıcısı.**
+**Cline API anahtarlarını Cline'ın kendi API'si (workos bearer) üzerinden toplu oluşturun ve her anahtarı 9Router'a kaydedin — OpenAI uyumlu çıkarım + 9Router bağlayıcısı.**
 
 [![Node](https://img.shields.io/badge/Node-%E2%89%A518-3DA639?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-blue?style=for-the-badge)](#)
@@ -22,7 +21,7 @@
 [![OmniRoute](https://img.shields.io/badge/OmniRoute-connector-8B5CF6?style=for-the-badge)](#-connect-to-omniroute)
 [![X](https://img.shields.io/badge/X-%40bigbullapp-000000?style=for-the-badge&logo=x&logoColor=white)](https://x.com/bigbullapp)
 
-[🛠 Hızlı başlangıç](#-quick-start) · [🎁 Ücretsiz katman](#-free-tier--how-much-you-get) · [🤖 Modeller](#-models--all-2-of-them) · [🧪 API'yi kullanma](#-how-to-use-the-api) · [✅ Doğrulandı](#-verified-working--every-key-is-tested) · [🧭 Nasıl çalışır](#-how-it-works) · [🔌 9Router](#-connect-to-9router) · [🔌 OmniRoute](#-connect-to-omniroute) · [⚙️ Seçenekler](#️-cli-options) · [🛰️ Proxy'ler](#️-behind-a-proxy) · [🐞 Sorunlar](#-issues)
+[🛠 Hızlı başlangıç](#-quick-start) · [🎁 Ücretsiz katman](#-free-tier--how-much-you-get) · [🤖 Modeller](#-models--all-2-of-them) · [🧪 API'yi kullanın](#-how-to-use-the-api) · [✅ Doğrulandı](#-verified-working--every-key-is-tested) · [🧭 Nasıl çalışır](#-how-it-works) · [🔌 9Router](#-connect-to-9router) · [🔌 OmniRoute](#-connect-to-omniroute) · [⚙️ Seçenekler](#️-cli-options) · [🛰️ Proxy'ler](#️-behind-a-proxy) · [🐞 Sorunlar](#-issues)
 
 </div>
 
@@ -36,15 +35,15 @@
 
 ## ✨ Bu neden var
 
-Cline, API anahtarlarını kendi düz HTTPS JSON API'si üzerinden üretir — anahtar başına bir `POST`, captcha yok, kart yok, telefon doğrulaması yok, tek kullanımlık gelen kutusu yok. Anahtarlar toplu olarak, gözlemlenen hiçbir hata olmadan, 200 anahtar başına yaklaşık 70 saniyede oluşturulur. Ardından her anahtar, 9Router'da tek bir `cline` sağlayıcı düğümü altında OpenAI uyumlu bir bağlantı olarak kaydedilir.
+Cline, API anahtarlarını kendi düz HTTPS JSON API'si üzerinden üretir — anahtar başına bir `POST`, captcha yok, kart yok, telefon doğrulaması yok, tek kullanımlık gelen kutusu yok. İki çalıştırmada (200 + 800) **oluşturulan her anahtar** 200 anahtar başına ~70 s'de **0 hata** ile tamamlandı. Ardından her anahtar, 9Router'da tek bir `cline` sağlayıcı düğümü altında OpenAI uyumlu bir bağlantı olarak kaydedilir.
 
 ## 🎁 Ücretsiz katman — ne kadar elde edersiniz
 
-**Bir Cline hesabı sınırsız `sk-…` anahtarı üretir ve ücretsiz modellere ulaşan anahtarlar hiçbir ücrete tabi değildir — kart yok, telefon yok, gelen kutusu yok.**
+**Bir Cline hesabı sınırsız `sk-…` anahtarı üretir ve ücretsiz modellere erişen anahtarlar hiçbir ücrete tabi değildir — kart yok, telefon yok, gelen kutusu yok.**
 
 | Ne | Değer |
 | --- | --- |
-| Bir anahtarın maliyeti | **$0** — anahtar oluşturma ücretsiz ve ölçüsüzdür (ölçüldü: 1000 anahtar, 0 hata) |
+| Bir anahtarın maliyeti | **$0** — anahtar oluşturma ücretsiz ve sınırsızdır (ölçülen: anahtarlar, 0 hata) |
 | Kart gerekli mi | **Hayır** |
 | Hız sınırı | Oluşturmada `429`/`5xx` geri çekilir ve 4 kez yeniden dener; oluşturmalar arasında `--delay 160` ms |
 | Kayıt | yok — araç, WorkOS yenileme token'ı aracılığıyla mevcut bir Cline hesabını yeniden kullanır |
@@ -54,20 +53,20 @@ Cline, API anahtarlarını kendi düz HTTPS JSON API'si üzerinden üretir — a
 > 💡 Ücretsiz katman Cline tarafından belirlenir ve değişebilir. Güncel sayıları [cline.bot](https://cline.bot) adresinden kontrol edin — ve kararı aracın kendi kapısına bırakın:
 
 ```bash
-node src/cli.js verify            # every key in keys.txt is re-tested with a real chat call
+node src/cli.js --verify-only     # every key in keys.txt is re-tested with a real chat call
 ```
 
 ## 🤖 Modeller — hepsi 2 tane
 
-Cline'in kataloğu daha geniştir ve ana hesabın bakiyesiyle kapılıdır; yeni bir anahtarın gerçekten kullanabileceği iki kimlik — ve `verify`'ın yokladığı şey — şunlardır:
+Cline'ın kataloğu daha geniştir ve ana hesabın bakiyesiyle sınırlandırılmıştır; yeni bir anahtarın gerçekten kullanabileceği iki kimlik — ve `verify`'ın yokladığı şey — şunlardır:
 
-| Model Kimliği | 9Router'da çağrım | Durum |
+| Model Kimliği | 9Router'da şöyle çağırın | Durum |
 | --- | --- | --- |
 | `poolside/laguna-s-2.1:free` | `cline/poolside/laguna-s-2.1:free` | ✅ `200` (ölçüldü) |
 | `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` | `cline/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` | 🔁 ikinci doğrulama yedeği |
 | ücretli modeller | `cline/<model>` | ⚠️ `402 insufficient_credits` — her anahtar hesap bakiyesini paylaşır |
 
-`--model <id>` tek bir modeli sabitler. `402`, doğrulama sayımında *kabul edilmiş* sayılır — anahtarın kimlik doğruladığını kanıtlar. Kendi hesabınızdaki kataloğu listelemek için:
+`--model <id>` tek bir modeli sabitler. `402`, doğrulama sayımında *kabul edildi* olarak sayılır — anahtarın kimlik doğruladığını kanıtlar. Kendi hesabınızdaki kataloğu listelemek için:
 
 ```bash
 curl https://api.cline.bot/api/v1/models -H "Authorization: Bearer workos:<your workos access token>"
@@ -75,7 +74,7 @@ curl https://api.cline.bot/api/v1/models -H "Authorization: Bearer workos:<your 
 
 ## 🧪 API nasıl kullanılır
 
-Yukarı akış temel URL'si **`https://api.cline.bot/api/v1`**'dir; anahtar, bearer değerinin tamamı olarak girer (Cline'in API'sinde `Authorization: Bearer sk-…`, hesap token'ı için `Bearer workos:<jwt>`). Anahtarlar 9Router'a girdikten sonra, bunun yerine router'ı çağırın — `http://localhost:20128/v1`:
+Yukarı akış temel URL'si **`https://api.cline.bot/api/v1`**'dir; anahtar, bearer değerinin tamamı olarak girer (Cline'ın API'sinde `Authorization: Bearer sk-…`, hesap token'ı için `Bearer workos:<jwt>`). Anahtarlar 9Router'a girdikten sonra bunun yerine yönlendiriciyi çağırın — `http://localhost:20128/v1`:
 
 ```bash
 curl http://localhost:20128/v1/chat/completions \
@@ -84,7 +83,7 @@ curl http://localhost:20128/v1/chat/completions \
   -d '{"model":"cline/poolside/laguna-s-2.1:free","messages":[{"role":"user","content":"hi"}]}'
 ```
 
-Doğrudan Cline'e karşı (her anahtar için `verify`'ın yaptığı şey):
+Doğrudan Cline'a karşı (`verify`'ın anahtar başına yaptığı şey):
 
 ```bash
 curl https://api.cline.bot/api/v1/chat/completions \
@@ -94,7 +93,7 @@ curl https://api.cline.bot/api/v1/chat/completions \
   -d '{"model":"poolside/laguna-s-2.1:free","messages":[{"role":"user","content":"hi"}],"max_tokens":8}'
 ```
 
-Ücretsiz model kombinasyonu, ısınma sonrasında 9Router'da ortalama **2,7 saniye** gecikme ölçtü.
+Ücretsiz model kombinasyonu, ısınma sonrasında 9Router'da **ortalama 2,7 s** gecikme ölçtü.
 
 ## 🛠 Hızlı başlangıç
 
@@ -115,27 +114,27 @@ node src/cli.js verify
 node src/cli.js connect --keys out/cline-keys.txt
 ```
 
-`create`, anahtar dosyasını her on anahtardan sonra yazar, böylece bir çökme ilerlemeyi asla kaybetmez; `verify` yanına bir `.verify.txt` sayımı yazar.
+`create`, anahtar dosyasını her on anahtarda bir yazar, böylece bir çökme ilerlemeyi asla kaybetmez; `verify` ise yanına bir `.verify.txt` sayımı yazar.
 
 ### 🖱️ Başlatıcı
 
-`node src/launcher.js` küçük bir menü açar — anahtar üret, doğrula veya yerel bir 9Router / OmniRoute ile kaydet (`--connect-9router`, `--connect-omniroute`) — ve yanıtları `launcher.config.json` içinde hatırlar. Yaptığı her şey aynı zamanda düz bir `src/cli.js` komutudur (`auth`, `list`, `create`, `verify`, `delete`, `connect`), yani menü isteğe bağlıdır.
+Burada etkileşimli bir menü yok — `src/cli.js` tüm arayüzdür (`auth`, `list`, `create`, `verify`, `delete`, `connect`) ve her bayrak komut satırında ayarlanabilir. `src/launcher.js` yalnızca CLINE ASCII banner'ını oluşturur.
 
 ## ✅ Çalıştığı doğrulandı — her anahtar test edilir
 
 | Kontrol | Sonuç |
 | --- | --- |
-| `POST https://api.cline.bot/api/v1/api-keys` (`{name}`) | anahtarlar tek partide oluşturuldu, hata yok, 200 başına ~70 sn |
+| `POST https://api.cline.bot/api/v1/api-keys` (`{name}`) | **oluşturulan her anahtar**, 0 hata, 200 başına ~70 s |
 | `poolside/laguna-s-2.1:free` üzerinde `POST /api/v1/chat/completions` | **200** — anahtar kimlik doğrular |
-| ücretli model | **402 insufficient_credits** — kimlik doğrulama sorunsuz, kapı paylaşılan bakiye |
+| ücretli model | **402 insufficient_credits** — kimlik doğrulama sorunsuz, kapı paylaşılan bakiyedir |
 | bozuk bir anahtar | **401** — doğru şekilde reddedildi |
 
 ```bash
 node src/cli.js verify --limit 20    # spot-check the first 20 keys
 ```
 
-> **Kalite kapıları.** Buradaki her anahtar, `keys.txt` dosyasına yazılmadan önce canlı bir `chat-200` geçti
-> (ölü anahtarlar asla gönderilmez). Router kombinasyonları model düzeyinde aynı kuralı izler: bir giriş
+> **Kalite kapıları.** Buradaki her anahtar `keys.txt` dosyasına yazılmadan önce canlı bir `chat-200` geçti
+> (ölü anahtarlar asla gönderilmez). Yönlendirici kombinasyonları model düzeyinde aynı kuralı izler: bir giriş
 > **yalnızca model `chat-200` yanıtlıyorsa ve araçları çağırabiliyorsa** eklenir — araç desteği olmayan bir model,
 > ölü bir anahtar veya ölü bir sağlayıcı eklenmek yerine çıkarılır. Doğrulama adımını istediğiniz zaman yeniden çalıştırın;
 > hatalar bildirilir, asla gizlenmez.
@@ -156,9 +155,9 @@ inbox (one address per account)                                  a fresh address
 3. **Doğrulama** — her anahtarla ücretsiz bir modele karşı `/api/v1/chat/completions` çağırın ve kimlik doğruladığını kanıtlayın.
 4. **Bağlama** — anahtarları 9Router'a OpenAI uyumlu bağlantılar olarak kaydedin.
 
-**`workos:` öneki tuzağı:** Cline'in API'si birebir öneki gerektirir — `Authorization: Bearer workos:<jwt>` çalışır, `Bearer <jwt>` ise `401 "re-authenticate your Cline account"` yanıtlar. Hata mesajı süresi dolmuş bir oturumu ima eder, ancak bu bir bearer biçimi hatasıdır; araç seti bunu otomatik olarak ele alır ve pes etmeden önce `401` üzerine bir kez token yenilemeyi zorlar.
+**`workos:` öneki tuzağı:** Cline'ın API'si birebir öneki gerektirir — `Authorization: Bearer workos:<jwt>` çalışır, `Bearer <jwt>` ise `401 "re-authenticate your Cline account"` yanıtlar. Hata mesajı süresi dolmuş bir oturumu ima eder, ancak bu bir bearer biçimi hatasıdır; araç seti bunu otomatik olarak ele alır ve pes etmeden önce `401` üzerinde bir token yenilemesini zorlar.
 
-WorkOS yenileme token'ı tek kullanımlıktır ve her yenilemede döner; en yenisi `out/.cline-auth.json` dosyasına kalıcı olarak yazılır (veya `CLINE_REFRESH_TOKEN`'dan okunur ya da yerel 9Router DB'sinden başlatılır).
+WorkOS yenileme token'ı tek kullanımlıktır ve her yenilemede döner; en yenisi `out/.cline-auth.json` dosyasına kalıcı olarak yazılır (veya `CLINE_REFRESH_TOKEN`'dan okunur ya da yerel 9Router DB'sinden önyüklenir).
 
 ## ⚙️ CLI seçenekleri
 
@@ -175,7 +174,7 @@ node src/cli.js connect                   # register keys into 9Router
 | --- | --- | --- |
 | `--count <n>` | oluşturulacak anahtar sayısı | `200` |
 | `--prefix <p>` | anahtar adı öneki (`<p>-NNN`) | `clx` |
-| `--start <n>` | partinin ilk indeksi | `1` |
+| `--start <n>` | partinin ilk dizini | `1` |
 | `--out <file>` | çıktı anahtar dosyası | `out/cline-keys.txt` |
 | `--model <id>` | doğrulama için model | otomatik yoklama |
 | `--conc <n>` | doğrulama için eşzamanlılık | `6` |
@@ -193,7 +192,7 @@ node src/cli.js connect                   # register keys into 9Router
 
 ## 🛰️ Proxy arkasında
 
-**Tasarım gereği proxy'lenmez.** Bu hat, Node'u çalıştıran makineden Node'un yerleşik `fetch`'i ile Cline'in API'sini konuşur — tarayıcı yok, CDP istemcisi yok ve proxy modülü yok. İstekler kendi adresinizden çıkar; burada bu sorun değildir çünkü anahtar oluşturma anahtar başına kayıt gerektirmez: mevcut bir hesap hepsini üretir. API'yi kendiniz önüne koyuyorsanız, yalnızca başka bir ana makineyi `--base-url` ile sabitleyin.
+**Tasarım gereği proxy'lenmez.** Bu hat, Cline'ın API'siyle Node'u çalıştıran makineden Node'un yerleşik `fetch`'ini kullanarak konuşur — tarayıcı yok, CDP istemcisi yok ve proxy modülü yok. İstekler kendi adresinizden çıkar; burada bu sorun değildir çünkü anahtar oluşturma anahtar başına kayıt gerektirmez: mevcut bir hesap hepsini üretir. API'yi kendiniz önüne alıyorsanız, yalnızca `--base-url` ile başka bir ana makine sabitleyin.
 
 ## 📄 Dosyalar
 
@@ -201,29 +200,33 @@ node src/cli.js connect                   # register keys into 9Router
 | --- | --- |
 | `out/cline-keys.txt` | üretilen `sk-…` anahtarları, satır başına bir tane — git tarafından yok sayılır |
 | `out/cline-keys.txt.verify.txt` | doğrulama sayımı |
-| `out/.cline-auth.json` | kalıcı olarak yazılan WorkOS yenileme token'ı — git tarafından yok sayılır, asla commit etmeyin |
+| `out/.cline-auth.json` | kalıcı hale getirilen WorkOS yenileme token'ı — git tarafından yok sayılır, asla commit etmeyin |
 | `src/cli.js` | `auth` · `list` · `create` · `delete` · `verify` · `connect` |
-| `src/connect-9router.js` · `src/connect-omniroute.js` | anahtarları bir 9Router / OmniRoute sağlayıcısı olarak kaydedin |
-| `examples/bulk-create.js` | bir betikten toplu anahtar oluşturun |
+| `src/connect-9router.js` | anahtarları bir 9Router sağlayıcısı olarak kaydeder |
+| `examples/bulk-create.js` | bir betikten anahtar partisi oluşturur |
 
-## 🔌 9Router'a bağlan
+## 🔌 9Router'a bağlanın
 
-[9Router](https://9router.com) kendi kendine barındırılan, OpenAI uyumlu bir router'dır (`npm install -g 9router && 9router`, kontrol paneli `http://localhost:20128` adresinde). Her anahtarı tek komutla kaydedin — `cline` sağlayıcı düğümü yoksa oluşturulur ve her anahtar bir bağlantı olarak eklenir:
+[9Router](https://9router.com), kendi kendine barındırılan, OpenAI uyumlu bir yönlendiricidir (`npm install -g 9router && 9router`, kontrol paneli `http://localhost:20128` adresinde). Her anahtarı tek komutla kaydedin — `cline` sağlayıcı düğümü yoksa oluşturulur ve her anahtar bir bağlantı olarak eklenir:
 
 ```bash
 node src/cli.js connect --keys out/cline-keys.txt
+
+# or as a library:
+#   import { connectBulk } from './src/connect-9router.js';
 ```
 
-## 🔌 OmniRoute'a bağlan
+Varsayılanlar: temel `http://localhost:20128`, parola `123456`, önek `cline`, yukarı akış `https://api.cline.bot/api/v1`, varsayılan model `poolside/laguna-s-2.1:free`, `cline` adlı istemci anahtarı. Modeller daha sonra `cline/<model id>` olarak sunulur ve her anahtar arasında yük dengelenir.
 
-[OmniRoute](https://omniroute.online) kendi kendine barındırılan, OpenAI uyumlu bir router'dır (`npm install -g omniroute && omniroute`, kontrol paneli `http://localhost:20128` adresinde). Bağlayıcı orada da aynı işi yapar — `cline` sağlayıcı düğümü yoksa oluşturulur ve `keys.txt` içindeki her anahtar bir bağlantı olarak eklenir:
+## 🔌 OmniRoute'a bağlanın
+
+[OmniRoute](https://omniroute.online), kendi kendine barındırılan, OpenAI uyumlu bir yönlendiricidir (`npm install -g omniroute && omniroute`, kontrol paneli `http://localhost:20128` adresinde). Her anahtarı tek komutla kaydedin — `cline` sağlayıcı düğümü yoksa oluşturulur ve her anahtar bir bağlantı olarak eklenir:
 
 ```bash
-node src/connect-omniroute.js                    # every key in keys.txt
-node src/connect-omniroute.js --api-key clx-…    # or one key at a time
+node src/cli.js connect --keys out/cline-keys.txt
+# or as a library:
+#   import { connectBulk } from './src/connect-omniroute.js';
 ```
-
-Etkileşimli başlatıcı aynı akışa ulaşır: `node src/launcher.js --connect-omniroute`.
 
 Varsayılanlar: temel `http://localhost:20128`, parola `123456`, önek `cline`, yukarı akış `https://api.cline.bot/api/v1`, varsayılan model `poolside/laguna-s-2.1:free`, `cline` adlı istemci anahtarı. Modeller daha sonra `cline/<model id>` olarak sunulur ve her anahtar arasında yük dengelenir.
 
@@ -232,8 +235,8 @@ Varsayılanlar: temel `http://localhost:20128`, parola `123456`, önek `cline`, 
 | | |
 | --- | --- |
 | 🏢 Sağlayıcı | **Cline** — [cline.bot](https://cline.bot) · uygulama [app.cline.bot](https://app.cline.bot) adresinde |
-| 🎁 Sağlayıcının verdikleri | her anahtarda ücretsiz modeller — bir WorkOS hesabından toplu sk-… anahtarları, captcha yok |
-| 🔑 Bir anahtar size ne kazandırır | Cline'in API'sine karşı kimlik doğrulayan bir `sk-…` anahtarı; harcaması **ana hesabın bakiyesini** izler (ücretsiz modeller `200`, ücretli modeller `402`) |
+| 🎁 Sağlayıcının verdikleri | her anahtarda ücretsiz modeller — tek bir WorkOS hesabından toplu sk-… anahtarları, captcha yok |
+| 🔑 Bir anahtar size ne kazandırır | Cline'ın API'sine karşı kimlik doğrulayan bir `sk-…` anahtarı; harcaması **ana hesabın bakiyesini** izler (ücretsiz modeller `200`, ücretli modeller `402`) |
 | 🌐 API biçimi | OpenAI uyumlu: `POST https://api.cline.bot/api/v1/chat/completions` |
 | 🔒 Verileriniz | yalnızca `api.cline.bot`, `api.workos.com` ve yerel 9Router'ınızla iletişim kurulur; anahtarlar ve WorkOS token'ı makinenizde kalır |
 

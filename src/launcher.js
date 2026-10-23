@@ -24,8 +24,8 @@ const CLI = path.join(__dirname, 'cli.js');
 
 const defaults = {
   count: 50,
-  prefix: 'clx',
-  model: 'poolside/laguna-s-2.1:free',
+  proxyFile: process.env['CLINE_PROXIES'] || 'proxies.txt',
+  model: "poolside/laguna-s-2.1:free",
   routerBase: 'http://localhost:20128',
   routerPassword: '123456',
 };
@@ -46,11 +46,10 @@ function saveConfig(cfg) {
   }
 }
 
-let rl = null;
+const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const ask = (question, fallback) =>
   new Promise((resolve) => {
     const hint = fallback ? ` [${String(fallback).slice(0, 30)}${String(fallback).length > 30 ? '…' : ''}]` : '';
-    if (!rl) rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     rl.question(`  ${question}${hint}: `, (answer) => resolve(answer.trim() || fallback || ''));
   });
 
@@ -99,16 +98,28 @@ function banner() {
 }
 
 async function mintFlow(cfg) {
-  cfg.count = parseInt(await ask('How many keys do you want to create (any number)', cfg.count), 10) || cfg.count;
-  cfg.prefix = await ask('Key name prefix', cfg.prefix);
+  cfg.count = parseInt(await ask('How many accounts/keys do you want (any number)', cfg.count), 10) || cfg.count;
+  cfg.proxyFile = await ask('Proxy list file (one proxy per line)', cfg.proxyFile);
+  cfg.model = await ask('Model used for the live verification', cfg.model);
   saveConfig(cfg);
-  run(['create', '--count', String(cfg.count), '--prefix', cfg.prefix]);
+
+  if (!fs.existsSync(path.resolve(ROOT, cfg.proxyFile)) && !fs.existsSync(cfg.proxyFile)) {
+    console.log(`  ! ${cfg.proxyFile} not found — running WITHOUT a proxy (direct)`);
+    console.log('    (put one exit per line there to route through proxies: http://host:port, socks5://host:port or host:port)');
+  }
+  run(['--count', String(cfg.count), '--model', cfg.model], { ['CLINE_PROXIES']: cfg.proxyFile });
 }
 
 async function verifyFlow(cfg) {
-  cfg.model = await ask('Model used for the live verification', cfg.model);
+  cfg.proxyFile = await ask('Proxy list file', cfg.proxyFile);
   saveConfig(cfg);
-  run(['verify', '--model', cfg.model]);
+  run(['--verify-only'], { ['CLINE_PROXIES']: cfg.proxyFile });
+}
+
+async function screenFlow(cfg) {
+  cfg.proxyFile = await ask('Proxy list file to screen', cfg.proxyFile);
+  saveConfig(cfg);
+  run(['--screen'], { ['CLINE_PROXIES']: cfg.proxyFile });
 }
 
 async function connectFlow(cfg) {
@@ -147,44 +158,42 @@ async function main() {
   const cfg = loadConfig();
   if (process.argv.includes('--connect-9router')) {
     await connectFlow(cfg);
-    if (rl) rl.close();
+    rl.close();
     return;
   }
 
   if (process.argv.includes('--connect-omniroute')) {
     await connectFlowOmni(cfg);
-    if (rl) rl.close();
+    rl.close();
     return;
   }
   banner();
-  console.log('  1) Mint keys      — create keys on the account and keep the ones that verify');
-  console.log('  2) Verify keys    — re-check every key with a live chat call');
-  console.log('  3) Settings       — show what this launcher remembers');
-  console.log('  4) Help           — CLI options and notes');
-  console.log('  5) Connect to 9Router — register the keys in keys.txt with a local 9Router');
-  console.log('  6) Connect to OmniRoute — register the keys in keys.txt with a local OmniRoute');
+  console.log('  1) Mint keys      — create one account per key and verify each with a live chat call');
+  console.log('  2) Verify keys    — re-check every key in keys.txt with a live chat call');
+  console.log('  3) Screen proxies — test your proxy list for exits that reach Cline');
+  console.log('  4) Settings       — show what this launcher remembers');
+  console.log('  5) Help           — CLI options and notes');
+  console.log('  6) Connect to 9Router — register the keys in keys.txt with a local 9Router');
+  console.log('  7) Connect to OmniRoute — register the keys in keys.txt with a local OmniRoute');
   console.log('  q) Quit\n');
   const choice = (await ask('Choose', '1')).toLowerCase();
 
   if (choice === '1') await mintFlow(cfg);
   else if (choice === '2') await verifyFlow(cfg);
-  else if (choice === '3') console.log('\n' + JSON.stringify(cfg, null, 2));
-  else if (choice === '4') run(['--help']);
-  else if (choice === '5') await connectFlow(cfg);
-  else if (choice === '6') await connectFlowOmni(cfg);
-  if (rl) rl.close();
+  else if (choice === '3') await screenFlow(cfg);
+  else if (choice === '4') console.log('\n' + JSON.stringify(cfg, null, 2));
+  else if (choice === '5') run(['--help']);
+  else if (choice === '6') await connectFlow(cfg);
+  else if (choice === '7') await connectFlowOmni(cfg);
+  rl.close();
 }
 
-if (require.main === module) {
-  if (process.argv.includes('--help') || process.argv.includes('-h')) {
-    console.log('Interactive launcher: run `node src/launcher.js` and pick a menu item.');
-    process.exit(0);
-  }
-
-  main().catch((e) => {
-    console.error('[fatal]', e.message);
-    process.exit(1);
-  });
+if (process.argv.includes('--help') || process.argv.includes('-h')) {
+  console.log('Interactive launcher: run `node src/launcher.js` and pick a menu item.');
+  process.exit(0);
 }
 
-module.exports = { showBanner: banner };
+main().catch((e) => {
+  console.error('[fatal]', e.message);
+  process.exit(1);
+});

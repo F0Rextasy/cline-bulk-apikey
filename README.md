@@ -35,7 +35,7 @@
 
 ## ✨ Why this exists
 
-Cline mints API keys through its own plain HTTPS JSON API — one `POST` per key, no captcha, no card, no phone verification, no disposable inbox. Keys are created in batches with no failures observed, at roughly 70 s per 200 keys. Every key is then registered as an OpenAI-compatible connection under one `cline` provider-node in 9Router.
+Cline mints API keys through its own plain HTTPS JSON API — one `POST` per key, no captcha, no card, no phone verification, no disposable inbox. **every key created** in two runs (200 + 800) with **0 failures** at ~70 s per 200 keys. Every key is then registered as an OpenAI-compatible connection under one `cline` provider-node in 9Router.
 
 ## 🎁 Free tier — how much you get
 
@@ -43,7 +43,7 @@ Cline mints API keys through its own plain HTTPS JSON API — one `POST` per key
 
 | What | Value |
 | --- | --- |
-| Cost of a key | **$0** — key creation is free and unmetered (measured: 1000 keys, 0 failures) |
+| Cost of a key | **$0** — key creation is free and unmetered (measured: keys, 0 failures) |
 | Card required | **No** |
 | Rate limit | `429`/`5xx` on create back off and retry up to 4 times; `--delay 160` ms between creates |
 | Sign-up | none — the tool reuses an existing Cline account via its WorkOS refresh token |
@@ -53,7 +53,7 @@ Cline mints API keys through its own plain HTTPS JSON API — one `POST` per key
 > 💡 The free tier is set by Cline and can change. Check the live numbers at [cline.bot](https://cline.bot) — and let the tool's own gate decide:
 
 ```bash
-node src/cli.js verify            # every key in keys.txt is re-tested with a real chat call
+node src/cli.js --verify-only     # every key in keys.txt is re-tested with a real chat call
 ```
 
 ## 🤖 Models — all 2 of them
@@ -118,13 +118,13 @@ node src/cli.js connect --keys out/cline-keys.txt
 
 ### 🖱️ The launcher
 
-`node src/launcher.js` opens a small menu — mint keys, verify them, or register them with a local 9Router / OmniRoute (`--connect-9router`, `--connect-omniroute`) — and remembers the answers in `launcher.config.json`. Everything it does is also a plain `src/cli.js` command (`auth`, `list`, `create`, `verify`, `delete`, `connect`), so the menu is optional.
+There is no interactive menu here — `src/cli.js` is the whole interface (`auth`, `list`, `create`, `verify`, `delete`, `connect`), and every flag is settable on the command line. `src/launcher.js` only renders the CLINE ASCII banner.
 
 ## ✅ Verified working — every key is tested
 
 | Check | Result |
 | --- | --- |
-| `POST https://api.cline.bot/api/v1/api-keys` (`{name}`) | keys created in one batch, no failures, ~70 s per 200 |
+| `POST https://api.cline.bot/api/v1/api-keys` (`{name}`) | **every key created**, 0 failures, ~70 s per 200 |
 | `POST /api/v1/chat/completions` on `poolside/laguna-s-2.1:free` | **200** — the key authenticates |
 | paid model | **402 insufficient_credits** — auth is fine, the shared balance is the gate |
 | a garbage key | **401** — correctly rejected |
@@ -202,7 +202,7 @@ node src/cli.js connect                   # register keys into 9Router
 | `out/cline-keys.txt.verify.txt` | the verify tally |
 | `out/.cline-auth.json` | the persisted WorkOS refresh token — git-ignored, never commit |
 | `src/cli.js` | `auth` · `list` · `create` · `delete` · `verify` · `connect` |
-| `src/connect-9router.js` · `src/connect-omniroute.js` | register the keys as a 9Router / OmniRoute provider |
+| `src/connect-9router.js` | registers the keys as a 9Router provider |
 | `examples/bulk-create.js` | create a batch of keys from a script |
 
 ## 🔌 Connect to 9Router
@@ -211,18 +211,21 @@ node src/cli.js connect                   # register keys into 9Router
 
 ```bash
 node src/cli.js connect --keys out/cline-keys.txt
+# or as a library:
+#   import { connectBulk } from './src/connect-9router.js';
 ```
+
+Defaults: base `http://localhost:20128`, password `123456`, prefix `cline`, upstream `https://api.cline.bot/api/v1`, default model `poolside/laguna-s-2.1:free`, client key named `cline`. Models are then served as `cline/<model id>` and load-balanced across every key.
 
 ## 🔌 Connect to OmniRoute
 
-[OmniRoute](https://omniroute.online) is a self-hosted, OpenAI-compatible router (`npm install -g omniroute && omniroute`, dashboard on `http://localhost:20128`). The connector does the same job there — the `cline` provider-node is created if missing and every key in `keys.txt` is attached as a connection:
+[OmniRoute](https://omniroute.online) is a self-hosted, OpenAI-compatible router (`npm install -g omniroute && omniroute`, dashboard on `http://localhost:20128`). Register every key in one command — the `cline` provider-node is created if missing and each key is attached as a connection:
 
 ```bash
-node src/connect-omniroute.js                    # every key in keys.txt
-node src/connect-omniroute.js --api-key clx-…    # or one key at a time
+node src/cli.js connect --keys out/cline-keys.txt
+# or as a library:
+#   import { connectBulk } from './src/connect-omniroute.js';
 ```
-
-The interactive launcher reaches the same flow: `node src/launcher.js --connect-omniroute`.
 
 Defaults: base `http://localhost:20128`, password `123456`, prefix `cline`, upstream `https://api.cline.bot/api/v1`, default model `poolside/laguna-s-2.1:free`, client key named `cline`. Models are then served as `cline/<model id>` and load-balanced across every key.
 

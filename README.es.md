@@ -1,7 +1,6 @@
 <div align="center">
 
 ```
-
  ██████╗██╗     ██╗███╗   ██╗███████╗
 ██╔════╝██║     ██║████╗  ██║██╔════╝
 ██║     ██║     ██║██╔██╗ ██║█████╗
@@ -22,7 +21,7 @@
 [![OmniRoute](https://img.shields.io/badge/OmniRoute-connector-8B5CF6?style=for-the-badge)](#-connect-to-omniroute)
 [![X](https://img.shields.io/badge/X-%40bigbullapp-000000?style=for-the-badge&logo=x&logoColor=white)](https://x.com/bigbullapp)
 
-[🛠 Inicio rápido](#-quick-start) · [🎁 Nivel gratuito](#-free-tier--how-much-you-get) · [🤖 Modelos](#-models--all-2-of-them) · [🧪 Usa la API](#-how-to-use-the-api) · [✅ Verificado](#-verified-working--every-key-is-tested) · [🧭 Cómo funciona](#-how-it-works) · [🔌 9Router](#-connect-to-9router) · [🔌 OmniRoute](#-connect-to-omniroute) · [⚙️ Opciones](#️-cli-options) · [🛰️ Proxies](#️-behind-a-proxy) · [🐞 Problemas](#-issues)
+[🛠 Inicio rápido](#-quick-start) · [🎁 Nivel gratuito](#-free-tier--how-much-you-get) · [🤖 Modelos](#-models--all-2-of-them) · [🧪 Usar la API](#-how-to-use-the-api) · [✅ Verificado](#-verified-working--every-key-is-tested) · [🧭 Cómo funciona](#-how-it-works) · [🔌 9Router](#-connect-to-9router) · [🔌 OmniRoute](#-connect-to-omniroute) · [⚙️ Opciones](#️-cli-options) · [🛰️ Proxies](#️-behind-a-proxy) · [🐞 Problemas](#-issues)
 
 </div>
 
@@ -36,7 +35,7 @@
 
 ## ✨ Por qué existe esto
 
-Cline emite claves API a través de su propia API JSON HTTPS simple — un `POST` por clave, sin captcha, sin tarjeta, sin verificación por teléfono, sin bandeja de entrada desechable. Las claves se crean en lotes sin fallos observados, a aproximadamente 70 s por cada 200 claves. Cada clave se registra luego como una conexión compatible con OpenAI bajo un único nodo proveedor `cline` en 9Router.
+Cline emite claves API a través de su propia API JSON HTTPS simple — un `POST` por clave, sin captcha, sin tarjeta, sin verificación por teléfono, sin bandeja de entrada desechable. **cada clave creada** en dos ejecuciones (200 + 800) con **0 fallos** a ~70 s por cada 200 claves. Cada clave se registra luego como una conexión compatible con OpenAI bajo un único nodo proveedor `cline` en 9Router.
 
 ## 🎁 Nivel gratuito — cuánto obtienes
 
@@ -44,17 +43,17 @@ Cline emite claves API a través de su propia API JSON HTTPS simple — un `POST
 
 | Qué | Valor |
 | --- | --- |
-| Coste de una clave | **$0** — la creación de claves es gratuita e ilimitada (medido: 1000 claves, 0 fallos) |
+| Coste de una clave | **$0** — la creación de claves es gratuita e ilimitada (medido: claves, 0 fallos) |
 | Tarjeta requerida | **No** |
 | Límite de tasa | `429`/`5xx` al crear aplican retroceso y reintentan hasta 4 veces; `--delay 160` ms entre creaciones |
 | Registro | ninguno — la herramienta reutiliza una cuenta de Cline existente mediante su token de refresco de WorkOS |
 | Qué puede gastar una clave | el **saldo de la cuenta principal**: los modelos gratuitos responden `200`, los modelos de pago responden `402 insufficient_credits` — cada clave comparte ese único saldo |
 | La unidad que escala | **una cuenta = muchas claves** (a diferencia de los proveedores de una cuenta por clave) → `--count N` en realidad significa "N claves del mismo saldo" |
 
-> 💡 El nivel gratuito lo define Cline y puede cambiar. Consulta los números en vivo en [cline.bot](https://cline.bot) — y deja que la propia verificación de la herramienta decida:
+> 💡 El nivel gratuito lo define Cline y puede cambiar. Consulta las cifras en vivo en [cline.bot](https://cline.bot) — y deja que la propia puerta de la herramienta decida:
 
 ```bash
-node src/cli.js verify            # every key in keys.txt is re-tested with a real chat call
+node src/cli.js --verify-only     # every key in keys.txt is re-tested with a real chat call
 ```
 
 ## 🤖 Modelos — los 2 que hay
@@ -64,7 +63,7 @@ El catálogo de Cline es más amplio y está limitado por el saldo de la cuenta 
 | ID del modelo | Llamada como en 9Router | Estado |
 | --- | --- | --- |
 | `poolside/laguna-s-2.1:free` | `cline/poolside/laguna-s-2.1:free` | ✅ `200` (medido) |
-| `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` | `cline/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` | 🔁 segunda opción de verificación |
+| `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` | `cline/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` | 🔁 segundo respaldo de verificación |
 | modelos de pago | `cline/<model>` | ⚠️ `402 insufficient_credits` — cada clave comparte el saldo de la cuenta |
 
 `--model <id>` fija un único modelo. `402` cuenta como *aceptado* en el recuento de verificación — demuestra que la clave se autentica. Para listar el catálogo en tu propia cuenta:
@@ -75,7 +74,7 @@ curl https://api.cline.bot/api/v1/models -H "Authorization: Bearer workos:<your 
 
 ## 🧪 Cómo usar la API
 
-La URL base upstream es **`https://api.cline.bot/api/v1`**; la clave se introduce como el valor completo del bearer (`Authorization: Bearer sk-…` en la API de Cline, `Bearer workos:<jwt>` para el token de cuenta). Una vez que las claves están en 9Router, llama al router en su lugar — `http://localhost:20128/v1`:
+La URL base ascendente es **`https://api.cline.bot/api/v1`**; la clave se introduce como el valor completo del bearer (`Authorization: Bearer sk-…` en la API de Cline, `Bearer workos:<jwt>` para el token de cuenta). Una vez que las claves están en 9Router, llama al router en su lugar — `http://localhost:20128/v1`:
 
 ```bash
 curl http://localhost:20128/v1/chat/completions \
@@ -94,7 +93,7 @@ curl https://api.cline.bot/api/v1/chat/completions \
   -d '{"model":"poolside/laguna-s-2.1:free","messages":[{"role":"user","content":"hi"}],"max_tokens":8}'
 ```
 
-La combinación de modelos gratuitos midió **2.7 s de latencia media** en 9Router tras el calentamiento.
+La combinación de modelo gratuito midió **2.7 s de latencia media** en 9Router tras el calentamiento.
 
 ## 🛠 Inicio rápido
 
@@ -119,13 +118,13 @@ node src/cli.js connect --keys out/cline-keys.txt
 
 ### 🖱️ El lanzador
 
-`node src/launcher.js` abre un pequeño menú — crear claves, verificarlas o registrarlas con un 9Router / OmniRoute local (`--connect-9router`, `--connect-omniroute`) — y recuerda las respuestas en `launcher.config.json`. Todo lo que hace también es un comando simple de `src/cli.js` (`auth`, `list`, `create`, `verify`, `delete`, `connect`), así que el menú es opcional.
+Aquí no hay menú interactivo — `src/cli.js` es toda la interfaz (`auth`, `list`, `create`, `verify`, `delete`, `connect`), y cada opción se puede establecer en la línea de comandos. `src/launcher.js` solo muestra el banner ASCII de CLINE.
 
 ## ✅ Verificado y funcionando — cada clave se prueba
 
 | Comprobación | Resultado |
 | --- | --- |
-| `POST https://api.cline.bot/api/v1/api-keys` (`{name}`) | claves creadas en un solo lote, sin fallos, ~70 s por cada 200 |
+| `POST https://api.cline.bot/api/v1/api-keys` (`{name}`) | **cada clave creada**, 0 fallos, ~70 s por cada 200 |
 | `POST /api/v1/chat/completions` en `poolside/laguna-s-2.1:free` | **200** — la clave se autentica |
 | modelo de pago | **402 insufficient_credits** — la autenticación está bien, el saldo compartido es la barrera |
 | una clave basura | **401** — rechazada correctamente |
@@ -137,7 +136,7 @@ node src/cli.js verify --limit 20    # spot-check the first 20 keys
 > **Controles de calidad.** Cada clave aquí pasó un `chat-200` en vivo antes de escribirse en `keys.txt`
 > (las claves muertas nunca se entregan). Las combinaciones del router siguen la misma regla a nivel de modelo: una entrada se
 > añade **solo si el modelo responde `chat-200` y puede llamar a herramientas** — un modelo sin soporte de herramientas,
-> una clave muerta o un proveedor muerto se descarta en lugar de añadirse. Vuelve a ejecutar el paso de verificación en cualquier momento;
+> una clave muerta o un proveedor muerto se descarta en lugar de añadirse. Vuelve a ejecutar el paso de verificación cuando quieras;
 > los fallos se reportan, nunca se ocultan.
 
 ## 🧭 Cómo funciona
@@ -156,7 +155,7 @@ inbox (one address per account)                                  a fresh address
 3. **Verificación** — llama a `/api/v1/chat/completions` con cada clave contra un modelo gratuito para demostrar que se autentica.
 4. **Conexión** — registra las claves en 9Router como conexiones compatibles con OpenAI.
 
-**La trampa del prefijo `workos:`:** la API de Cline requiere el prefijo literal — `Authorization: Bearer workos:<jwt>` funciona, `Bearer <jwt>` responde `401 "re-authenticate your Cline account"`. El mensaje de error sugiere una sesión expirada, pero es un bug de forma del bearer; el toolkit lo maneja automáticamente y fuerza un refresco de token ante `401` antes de rendirse.
+**La trampa del prefijo `workos:`:** la API de Cline requiere el prefijo literal — `Authorization: Bearer workos:<jwt>` funciona, `Bearer <jwt>` responde `401 "re-authenticate your Cline account"`. El mensaje de error sugiere una sesión caducada, pero es un fallo de forma del bearer; el kit de herramientas lo maneja automáticamente y fuerza un refresco de token ante `401` antes de rendirse.
 
 El token de refresco de WorkOS es de un solo uso y rota en cada refresco; el más reciente se persiste en `out/.cline-auth.json` (o se lee de `CLINE_REFRESH_TOKEN`, o se inicializa desde la base de datos local de 9Router).
 
@@ -174,7 +173,7 @@ node src/cli.js connect                   # register keys into 9Router
 | Opción | Descripción | Predeterminado |
 | --- | --- | --- |
 | `--count <n>` | número de claves a crear | `200` |
-| `--prefix <p>` | prefijo del nombre de la clave (`<p>-NNN`) | `clx` |
+| `--prefix <p>` | prefijo del nombre de clave (`<p>-NNN`) | `clx` |
 | `--start <n>` | primer índice del lote | `1` |
 | `--out <file>` | archivo de claves de salida | `out/cline-keys.txt` |
 | `--model <id>` | modelo para la verificación | auto-sondeo |
@@ -193,7 +192,7 @@ node src/cli.js connect                   # register keys into 9Router
 
 ## 🛰️ Detrás de un proxy
 
-**Sin proxy por diseño.** Esta vía habla con la API de Cline usando el `fetch` integrado de Node desde la máquina que ejecuta Node — no hay navegador, ni cliente CDP, ni módulo de proxy. Las solicitudes salen desde tu propia dirección, lo cual está bien aquí porque la creación de claves no requiere registro por clave: una cuenta existente las emite todas. Fija otro host con `--base-url` solo si tú mismo pones un frontend a la API.
+**Sin proxy por diseño.** Este canal habla con la API de Cline usando el `fetch` integrado de Node desde la máquina que ejecuta Node — no hay navegador, ni cliente CDP, ni módulo de proxy. Las solicitudes salen desde tu propia dirección, lo cual está bien aquí porque la creación de claves no requiere registro por clave: una cuenta existente las emite todas. Fija otro host con `--base-url` solo si tú mismo pones un frontend a la API.
 
 ## 📄 Archivos
 
@@ -203,29 +202,33 @@ node src/cli.js connect                   # register keys into 9Router
 | `out/cline-keys.txt.verify.txt` | el recuento de verificación |
 | `out/.cline-auth.json` | el token de refresco de WorkOS persistido — ignorado por git, nunca lo confirmes |
 | `src/cli.js` | `auth` · `list` · `create` · `delete` · `verify` · `connect` |
-| `src/connect-9router.js` · `src/connect-omniroute.js` | registra las claves como proveedor de 9Router / OmniRoute |
+| `src/connect-9router.js` | registra las claves como un proveedor de 9Router |
 | `examples/bulk-create.js` | crea un lote de claves desde un script |
 
 ## 🔌 Conectar con 9Router
 
-[9Router](https://9router.com) es un router autoalojado compatible con OpenAI (`npm install -g 9router && 9router`, panel en `http://localhost:20128`). Registra cada clave con un solo comando — el nodo proveedor `cline` se crea si falta y cada clave se adjunta como una conexión:
+[9Router](https://9router.com) es un router autoalojado y compatible con OpenAI (`npm install -g 9router && 9router`, panel en `http://localhost:20128`). Registra cada clave con un solo comando — el nodo proveedor `cline` se crea si falta y cada clave se adjunta como una conexión:
 
 ```bash
 node src/cli.js connect --keys out/cline-keys.txt
+
+# or as a library:
+#   import { connectBulk } from './src/connect-9router.js';
 ```
+
+Predeterminados: base `http://localhost:20128`, contraseña `123456`, prefijo `cline`, ascendente `https://api.cline.bot/api/v1`, modelo predeterminado `poolside/laguna-s-2.1:free`, clave de cliente llamada `cline`. Los modelos se sirven entonces como `cline/<model id>` y se balancean la carga entre todas las claves.
 
 ## 🔌 Conectar con OmniRoute
 
-[OmniRoute](https://omniroute.online) es un router autoalojado compatible con OpenAI (`npm install -g omniroute && omniroute`, panel en `http://localhost:20128`). El conector hace el mismo trabajo allí — el nodo proveedor `cline` se crea si falta y cada clave en `keys.txt` se adjunta como una conexión:
+[OmniRoute](https://omniroute.online) es un router autoalojado y compatible con OpenAI (`npm install -g omniroute && omniroute`, panel en `http://localhost:20128`). Registra cada clave con un solo comando — el nodo proveedor `cline` se crea si falta y cada clave se adjunta como una conexión:
 
 ```bash
-node src/connect-omniroute.js                    # every key in keys.txt
-node src/connect-omniroute.js --api-key clx-…    # or one key at a time
+node src/cli.js connect --keys out/cline-keys.txt
+# or as a library:
+#   import { connectBulk } from './src/connect-omniroute.js';
 ```
 
-El lanzador interactivo llega al mismo flujo: `node src/launcher.js --connect-omniroute`.
-
-Predeterminados: base `http://localhost:20128`, contraseña `123456`, prefijo `cline`, upstream `https://api.cline.bot/api/v1`, modelo predeterminado `poolside/laguna-s-2.1:free`, clave de cliente llamada `cline`. Los modelos se sirven entonces como `cline/<model id>` y se balancean la carga entre todas las claves.
+Predeterminados: base `http://localhost:20128`, contraseña `123456`, prefijo `cline`, ascendente `https://api.cline.bot/api/v1`, modelo predeterminado `poolside/laguna-s-2.1:free`, clave de cliente llamada `cline`. Los modelos se sirven entonces como `cline/<model id>` y se balancean la carga entre todas las claves.
 
 ## 🔑 Qué te da una clave
 

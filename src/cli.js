@@ -300,14 +300,16 @@ async function cmdVerify() {
   ];
   fs.writeFileSync(out, lines.join('\n') + '\n');
   // A key the panel refuses (401/403) is dead: it leaves the keys file and is
-  // parked in out/keys-dead.txt. A network blip or a 5xx is not a verdict.
+  // parked in keys-dead.txt *next to the keys file*. A network blip or a 5xx is
+  // not a verdict.
   const dead = results.filter((r) => [401, 403].includes(Number(r.status)));
   if (dead.length) {
     const raw = fs.readFileSync(file, 'utf8').split(/\r?\n/);
     const drop = new Set(dead.map((r) => r.prefix));
     fs.writeFileSync(file, raw.filter((l) => !l.trim() || !drop.has(l.trim().split(/[\s,]+/)[0].slice(0, 16))).join('\n'));
-    fs.appendFileSync(path.join(OUT_DIR, 'keys-dead.txt'), dead.map((r) => r.key).join('\n') + '\n');
-    console.log(`dead keys: ${dead.length} → ${path.join(OUT_DIR, 'keys-dead.txt')} (out of ${path.basename(file)})`);
+    const deadFile = path.join(path.dirname(path.resolve(file)), 'keys-dead.txt');
+    fs.appendFileSync(deadFile, dead.map((r) => `${r.key}\t${r.status}\t${new Date().toISOString()}`).join('\n') + '\n');
+    console.log(`dead keys: ${dead.length} → ${path.relative(process.cwd(), deadFile)} (out of ${path.basename(file)})`);
   }
   console.log(`tally ${JSON.stringify(tally)} · accepted ${accepted}/${keys.length} → ${out}`);
   return { model, tally, accepted, results };
@@ -367,7 +369,7 @@ Options:
 
 Keys:
   out/cline-keys.txt   the keys (default; --out <file> changes it)
-  out/keys-dead.txt    keys a verify refused outright (401/403) — moved out of the keys file
+  keys-dead.txt        keys a verify refused outright (401/403) — written NEXT TO the keys file
 
 Environment:
   CLINE_API            Cline API base (default: https://api.cline.bot)

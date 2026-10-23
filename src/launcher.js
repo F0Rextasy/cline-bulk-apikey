@@ -188,12 +188,17 @@ async function main() {
   rl.close();
 }
 
-if (process.argv.includes('--help') || process.argv.includes('-h')) {
-  console.log('Interactive launcher: run `node src/launcher.js` and pick a menu item.');
-  process.exit(0);
-}
+// The CLI imports the banner from here; requiring this file must not run the menu.
+module.exports = { showBanner: banner, banner };
 
-main().catch((e) => {
-  console.error('[fatal]', e.message);
-  process.exit(1);
-});
+if (require.main === module) {
+  if (process.argv.includes('--help') || process.argv.includes('-h')) {
+    console.log('Interactive launcher: run `node src/launcher.js` and pick a menu item.');
+    process.exit(0);
+  }
+
+  main().catch((e) => {
+    console.error('[fatal]', e.message);
+    process.exit(1);
+  });
+}

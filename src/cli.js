@@ -283,7 +283,7 @@ async function cmdVerify() {
         if (![429, 500, 502, 503, 504].includes(Number(r.status)) || attempt === retries) break;
         await sleep(2000 * (attempt + 1));
       }
-      results[my] = { i: my + 1, prefix: k.slice(0, 16), ...r };
+      results[my] = { i: my + 1, prefix: k.slice(0, 16), key: k, ...r };
       if ((my + 1) % 25 === 0) console.log(`  …${my + 1}/${keys.length}`);
       if (gap) await sleep(gap);
     }
@@ -299,6 +299,16 @@ async function cmdVerify() {
     ...results.map((r) => `${r.i}\t${r.prefix} …\t${r.status}\t${r.sample || r.err}`),
   ];
   fs.writeFileSync(out, lines.join('\n') + '\n');
+  // A key the panel refuses (401/403) is dead: it leaves the keys file and is
+  // parked in out/keys-dead.txt. A network blip or a 5xx is not a verdict.
+  const dead = results.filter((r) => [401, 403].includes(Number(r.status)));
+  if (dead.length) {
+    const raw = fs.readFileSync(file, 'utf8').split(/\r?\n/);
+    const drop = new Set(dead.map((r) => r.prefix));
+    fs.writeFileSync(file, raw.filter((l) => !l.trim() || !drop.has(l.trim().split(/[\s,]+/)[0].slice(0, 16))).join('\n'));
+    fs.appendFileSync(path.join(OUT_DIR, 'keys-dead.txt'), dead.map((r) => r.key).join('\n') + '\n');
+    console.log(`dead keys: ${dead.length} → ${path.join(OUT_DIR, 'keys-dead.txt')} (out of ${path.basename(file)})`);
+  }
   console.log(`tally ${JSON.stringify(tally)} · accepted ${accepted}/${keys.length} → ${out}`);
   return { model, tally, accepted, results };
 }
@@ -333,6 +343,7 @@ Usage:
   cline-bulk verify                    # verify keys work
   cline-bulk delete --name clx-001     # delete a key
   cline-bulk connect                   # register keys into 9Router
+  node src/cli.js create --count N     # one command: N keys, nothing else to answer
 
 Options:
   --count <n>          number of keys to create (default: 200)
@@ -353,6 +364,10 @@ Options:
   --router <url>       9Router URL (default: http://localhost:20128)
   --router-password    9Router password (default: 123456)
   --help, -h           print this help
+
+Keys:
+  out/cline-keys.txt   the keys (default; --out <file> changes it)
+  out/keys-dead.txt    keys a verify refused outright (401/403) — moved out of the keys file
 
 Environment:
   CLINE_API            Cline API base (default: https://api.cline.bot)

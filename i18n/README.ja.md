@@ -62,6 +62,15 @@ node src/cli.js connect --keys out/cline-keys.txt
 
 `create` は 10 キーごとにキーファイルを書き出すため、途中でクラッシュしても進捗は失われません。`verify` はその隣に `.verify.txt` の集計を書き出します。
 
+
+# Register them in OmniRoute
+node src/cli.js connect --keys out/cline-keys.txt
+```
+
+`create` は 10 キーごとにキーファイルを書き出すため、途中でクラッシュしても進捗は失われません。`verify` はその隣に `.verify.txt` の集計を書き出します。
+
+```
+
 ## 🛠 使い方
 
 ```bash

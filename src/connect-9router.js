@@ -1,40 +1,65 @@
+#!/usr/bin/env node
 'use strict';
 
 /**
- * 9Router connector for Cline API keys.
+ * Connect Cline to a 9Router instance.
  *
- * Registers Cline as an OpenAI-compatible provider in 9Router and attaches
- * API keys as connections.
+ * Cline serves an OpenAI-compatible endpoint (https://api.cline.bot/api/v1), so a single
+ * provider-node carries every key: this registers one `openai-compatible` node
+ * with prefix `cline` and then one connection per API key, named
+ * `cline-001`, `cline-002`, … Re-running it is idempotent (an existing node
+ * or connection is reused), and 9Router load-balances across the keys of a node.
  *
- * 9Router: npm install -g 9router && 9router  # dashboard http://localhost:20128
+ * Usage:
+ *   node src/connect-9router.js \
+ *     --base http://localhost:20128 --password 123456 \
+ *     --api-key cline_xxxx [--name "Cline"] [--prefix cline]
+ *
+ *   node src/connect-9router.js                  # register every key in keys.txt
+ *   node src/connect-9router.js --model <id>     # pin the connection's default model
+ *
+ * Options:
+ *   --base <url>       9Router base URL         (default http://localhost:20128)
+ *   --password <pw>    9Router login password   (default 123456)
+ *   --api-key <key>    Cline API key     (default: every key in keys.txt)
+ *   --name <name>      provider-node name       (default Cline)
+ *   --prefix <slug>    provider prefix in 9Router (default cline)
+ *   --base-url <url>   provider base URL        (default https://api.cline.bot/api/v1)
+ *   --model <id>       connection default model (default: provider's default model)
+ *
+ * Zero dependencies. Node.js >= 18.
  */
 
-import fs from 'node:fs';
+const fs = require('fs');
+const path = require('path');
 
-const UA = 'cline-bulk-9router/1.0';
+const UA = 'cline-bulk-9router-connector/1.0'
 
-/** One `sk-…` per line; `#` lines are comments; a trailing name/prefix column is dropped. */
-function readKeysFile(file) {
-  return fs.readFileSync(file, 'utf8')
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l && !l.startsWith('#'))
-    .map((l) => l.split(/[\s,]+/)[0]);
-}
+const DEFAULTS = {
+  base: 'http://localhost:20128',
+  password: '123456',
+  name: "Cline",
+  prefix: "cline",
+  baseUrl: "https://api.cline.bot/api/v1",
+  defaultModel: "poolside/laguna-s-2.1:free",
+};
 
-async function login(base, password) {
+/** Model ids a fresh key lists, as routed under `<prefix>/…` by 9Router. */
+const MODELS = ["poolside/laguna-s-2.1:free","nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"];
+
+async function login9router(base, password) {
   const res = await fetch(`${base}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'User-Agent': UA },
-    body: JSON.stringify({ password: password ?? '123456' }),
+    body: JSON.stringify({ password: password ?? DEFAULTS.password }),
   });
   const sc = typeof res.headers.getSetCookie === 'function' ? res.headers.getSetCookie() : [];
   const cookie = sc.map((c) => c.split(';')[0]).join('; ');
   return { ok: res.ok, cookie, body: (await res.text()).slice(0, 200) };
 }
 
-async function apiCall(base, cookie, path, init = {}) {
-  const res = await fetch(`${base}${path}`, {
+async function api(base, cookie, route, init = {}) {
+  const res = await fetch(`${base}${route}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -45,145 +70,143 @@ async function apiCall(base, cookie, path, init = {}) {
   });
   const text = await res.text();
   let json = null;
-  try { json = JSON.parse(text); } catch { /* ignore */ }
+  try {
+    json = JSON.parse(text);
+  } catch {
+    /* a non-JSON answer is reported as text */
+  }
   return { status: res.status, ok: res.ok, json, text: text.slice(0, 400) };
 }
 
-async function ensureProviderNode(base, cookie, { name, prefix, baseUrl }) {
-  const list = await apiCall(base, cookie, '/api/provider-nodes');
+async function ensureNode(base, cookie, { name, prefix, baseUrl }) {
+  const list = await api(base, cookie, '/api/provider-nodes');
   const nodes = (list.json && list.json.nodes) || [];
-  const existing = nodes.find((n) => n.name === name || n.prefix === prefix);
-  if (existing) return { node: existing, created: false };
-  const created = await apiCall(base, cookie, '/api/provider-nodes', {
+  const existing = nodes.find((n) => n.prefix === prefix || n.name === name);
+  if (existing) {
+    console.log(`provider-node exists: ${existing.id} (prefix ${existing.prefix} · baseUrl ${existing.baseUrl || baseUrl})`);
+    return existing;
+  }
+  const created = await api(base, cookie, '/api/provider-nodes', {
     method: 'POST',
     body: JSON.stringify({ name, prefix, apiType: 'chat', type: 'openai-compatible', baseUrl }),
   });
-  if (!created.ok) throw new Error(`create provider-node failed ${created.status}: ${created.text}`);
-  return { node: created.json.node, created: true };
+  if (!created.ok) throw new Error(`create node failed ${created.status}: ${created.text}`);
+  console.log(`provider-node created: ${created.json.node.id}`);
+  return created.json.node;
 }
 
-async function ensureConnection(base, cookie, { nodeId, name, apiKey, defaultModel, known }) {
-  // `known` is a snapshot of `${provider}|${name}` taken once by the caller, so a
-  // bulk run does not re-list every connection for every key.
-  if (known && known.has(`${nodeId}|${name}`)) return { connection: null, created: false };
-  const list = await apiCall(base, cookie, '/api/providers');
+async function ensureConnection(base, cookie, { nodeId, name, apiKey, priority = 1, defaultModel }) {
+  const list = await api(base, cookie, '/api/providers');
   const conns = (list.json && list.json.connections) || [];
-  const existing = conns.find((c) => c.provider === nodeId && c.name === name);
-  if (existing) return { connection: existing, created: false };
-  const created = await apiCall(base, cookie, '/api/providers', {
+  const existing = conns.find((c) => c.name === name);
+  if (existing) {
+    console.log(`connection exists: ${existing.id} (${existing.name})`);
+    return existing;
+  }
+  const created = await api(base, cookie, '/api/providers', {
     method: 'POST',
-    body: JSON.stringify({ provider: nodeId, apiKey, name, priority: 1, defaultModel: defaultModel || null }),
+    body: JSON.stringify({ provider: nodeId, apiKey, name, priority, defaultModel: defaultModel || null }),
   });
   if (!created.ok && created.status !== 409) {
     throw new Error(`create connection failed ${created.status}: ${created.text}`);
   }
-  if (known) known.add(`${nodeId}|${name}`);
-  return { connection: created.json && created.json.connection, created: true };
+  console.log(`connection created: ${(created.json && created.json.connection && created.json.connection.id) || '(conflict)'}`);
+  return created.json && created.json.connection;
 }
 
-async function ensureClientKey(base, cookie, name = 'cline') {
-  const list = await apiCall(base, cookie, '/api/keys');
-  const keys = (list.json && list.json.keys) || [];
-  const existing = keys.find((k) => k.name === name && k.isActive);
-  if (existing) return existing.key;
-  const created = await apiCall(base, cookie, '/api/keys', {
-    method: 'POST',
-    body: JSON.stringify({ name }),
-  });
-  if (!created.ok) throw new Error(`create client key failed ${created.status}: ${created.text}`);
-  return created.json.key;
-}
-
-async function connect({
-  base = 'http://localhost:20128',
-  password = '123456',
-  apiKey,
-  name = 'Cline',
-  prefix = 'cline',
-  baseUrl = 'https://api.cline.bot/api/v1',
-  defaultModel = 'poolside/laguna-s-2.1:free',
-  clientKeyName = 'cline',
-}) {
-  if (!apiKey) throw new Error('connect(): apiKey is required');
-  const { cookie, ok, body } = await login(base, password);
-  if (!ok && !/already|success|ok/i.test(body)) {
-    throw new Error(`9Router login failed: ${body}`);
+/** Register every key of `keys` — one connection per key, `<prefix>-001`, `-002`, … */
+async function connectKeys({
+  base = DEFAULTS.base,
+  password = DEFAULTS.password,
+  keys,
+  name = DEFAULTS.name,
+  prefix = DEFAULTS.prefix,
+  baseUrl = DEFAULTS.baseUrl,
+  defaultModel = DEFAULTS.defaultModel,
+} = {}) {
+  const list = (keys || []).map((k) => String(k).trim()).filter(Boolean);
+  if (!list.length) throw new Error('--api-key is required (or put your keys in keys.txt)');
+  const url = String(base).replace(/\/+$/, '');
+  const { ok, cookie, body } = await login9router(url, password);
+  console.log(`9Router login: ${ok ? 'ok' : 'not required/failed'} ${ok ? '' : body}`);
+  const node = await ensureNode(url, cookie, { name, prefix, baseUrl });
+  const out = [];
+  for (let i = 0; i < list.length; i++) {
+    const connName = `${prefix}-${String(i + 1).padStart(3, '0')}`;
+    out.push(await ensureConnection(url, cookie, { nodeId: node.id, name: connName, apiKey: list[i], defaultModel }));
   }
-  const { node } = await ensureProviderNode(base, cookie, { name, prefix, baseUrl });
-  const { connection } = await ensureConnection(base, cookie, { nodeId: node.id, name, apiKey, defaultModel });
-  const clientKey = await ensureClientKey(base, cookie, clientKeyName);
-  return { clientKey, nodeId: node.id, connectionId: connection && connection.id, baseUrl: `${base}/v1` };
+  console.log(`\nDone. ${list.length} key(s) on node ${node.id} — models: ${MODELS.map((m) => `${prefix}/${m}`).join(' · ')}`);
+  return out;
 }
 
-async function connectBulk({
-  base = 'http://localhost:20128',
-  password = '123456',
-  keysFile,
-  prefix = 'cline',
-  defaultModel = 'poolside/laguna-s-2.1:free',
-}) {
-  const keys = readKeysFile(keysFile);
+/** Register one key — rotate keys by calling this again with another `apiKey`. */
+async function connect9Router(opts = {}) {
+  const [connection] = await connectKeys({ ...opts, keys: [opts.apiKey] });
+  return connection;
+}
 
-  console.log(`connecting ${keys.length} keys to 9Router at ${base}`);
-  const results = [];
-  
-  const { cookie, ok, body } = await login(base, password);
-  if (!ok) throw new Error(`9Router login failed: ${body}`);
-  const { node } = await ensureProviderNode(base, cookie, { 
-    name: 'Cline', 
-    prefix, 
-    baseUrl: 'https://api.cline.bot/api/v1' 
-  });
+/** `keys.txt` at the checkout root (beside `src/`) — the layout the tools run in. */
+function defaultKeysFile() {
+  return path.join(__dirname, '..', 'keys.txt');
+}
 
-  const list = await apiCall(base, cookie, '/api/providers');
-  const known = new Set(((list.json && list.json.connections) || []).map((c) => `${c.provider}|${c.name}`));
+function readKeys(keysFile = defaultKeysFile()) {
+  if (!fs.existsSync(keysFile)) return [];
+  return fs
+    .readFileSync(keysFile, 'utf8')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'));
+}
 
-  for (let i = 0; i < keys.length; i++) {
-    const key = keys[i];
-    const name = `${prefix}-${String(i + 1).padStart(3, '0')}`;
-    try {
-      const { connection, created } = await ensureConnection(base, cookie, {
-        nodeId: node.id,
-        name,
-        apiKey: key,
-        defaultModel,
-        known,
-      });
-      results.push({ i: i + 1, key: key.slice(0, 16) + '…', connectionId: connection?.id, created });
-      console.log(`  [${i + 1}/${keys.length}] ${name} → ${created ? 'created' : 'exists'}`);
-    } catch (e) {
-      console.error(`  [${i + 1}/${keys.length}] ${name} → FAILED: ${e.message}`);
-      results.push({ i: i + 1, key: key.slice(0, 16) + '…', error: e.message });
-    }
+async function connectKeysFile({ keysFile = defaultKeysFile(), ...opts } = {}) {
+  const keys = readKeys(keysFile);
+  if (!keys.length) throw new Error(`no API keys in ${keysFile} — mint some first, or pass --api-key`);
+  console.log(`keys: ${keys.length} from ${keysFile}`);
+  return connectKeys({ ...opts, keys });
+}
+
+function parseRouterArgs(argv = process.argv.slice(2)) {
+  const arg = (name) => {
+    const i = argv.indexOf(`--${name}`);
+    return i === -1 ? undefined : argv[i + 1];
+  };
+  return {
+    base: arg('base'),
+    password: arg('password'),
+    apiKey: arg('api-key'),
+    name: arg('name'),
+    prefix: arg('prefix'),
+    baseUrl: arg('base-url'),
+    defaultModel: arg('model'),
+  };
+}
+
+if (require.main === module) {
+  const argv = process.argv.slice(2);
+  if (argv.includes('--help') || argv.includes('-h')) {
+    const doc = fs.readFileSync(__filename, 'utf8').match(/\/\*\*([\s\S]*?)\*\//);
+    console.log(doc ? doc[1].replace(/^\s*\*[ ]?/gm, '').trim() : 'see README.md');
+    process.exit(0);
   }
-
-  const clientKey = await ensureClientKey(base, cookie, prefix);
-  console.log(`\n9Router client key: ${clientKey}`);
-  console.log(`Endpoint: ${base}/v1`);
-  console.log(`Models: ${prefix}/poolside/laguna-s-2.1:free, ${prefix}/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`);
-
-  return { clientKey, nodeId: node.id, results };
-}
-
-async function listRouterModels(base, clientKey, { filter = 'cline/' } = {}) {
-  const res = await fetch(`${base}/v1/models`, {
-    headers: { Authorization: `Bearer ${clientKey}`, 'User-Agent': UA },
+  const opts = parseRouterArgs(argv);
+  const run = opts.apiKey ? connect9Router(opts) : connectKeysFile(opts);
+  run.catch((e) => {
+    console.error('[fatal] ' + e.message);
+    process.exit(1);
   });
-  if (!res.ok) throw new Error(`router /v1/models -> ${res.status}`);
-  const data = await res.json();
-  const ids = (data.data || []).map((m) => m.id);
-  return filter ? ids.filter((id) => id.includes(filter)) : ids;
 }
 
-export {
-  login,
-  apiCall,
-  ensureProviderNode,
+module.exports = {
+  connect9Router,
+  connectKeys,
+  connectKeysFile,
+  readKeys,
+  defaultKeysFile,
+  parseRouterArgs,
+  login9router,
+  ensureNode,
   ensureConnection,
-  ensureClientKey,
-  connect,
-  connectBulk,
-  listRouterModels,
-  readKeysFile,
-  UA,
+  DEFAULTS,
+  MODELS,
 };

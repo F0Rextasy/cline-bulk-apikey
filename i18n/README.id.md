@@ -128,6 +128,38 @@ curl http://localhost:20128/v1/chat/completions \
   -d '{"model":"cline/poolside/laguna-s-2.1:free","messages":[{"role":"user","content":"hi"}]}'
 ```
 
+
+## 🔌 Hubungkan ke OmniRoute
+
+OmniRoute adalah router kompatibel-OpenAI yang di-hosting sendiri:
+
+```bash
+npm install -g omniroute && omniroute        # dashboard on http://localhost:20128
+```
+
+Daftarkan semua key Anda dengan satu perintah (membuat provider-node `cline` jika belum ada dan melampirkan setiap key sebagai koneksi):
+
+```bash
+node src/cli.js connect --keys out/cline-keys.txt
+```
+
+Kombinasi model gratis mencatat latensi rata-rata **2.7 s** setelah pemanasan.
+
+```
+Endpoint : http://localhost:20128/v1
+API key  : sk-<omniroute client key>
+Models   : cline/poolside/laguna-s-2.1:free, cline/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
+```
+
+Panggil seperti endpoint OpenAI biasa:
+
+```bash
+curl http://localhost:20128/v1/chat/completions \
+  -H "Authorization: Bearer sk-<omniroute key>" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"cline/poolside/laguna-s-2.1:free","messages":[{"role":"user","content":"hi"}]}'
+```
+
 ## 🧠 Model yang tersedia
 
 | Model | Panggil di 9Router | Status |

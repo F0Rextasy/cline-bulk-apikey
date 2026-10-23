@@ -12,12 +12,9 @@
  *   cline-bulk connect                   # register keys into 9Router
  */
 
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { showBanner } from './launcher.js';
-import { readKeysFile } from './connect-9router.js';
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const fs = require('fs');
+const path = require('path');
+const { showBanner } = require('./launcher.js');
 
 const BASE = (process.env.CLINE_API || 'https://api.cline.bot').replace(/\/$/, '');
 const OUT_DIR = path.join(__dirname, '..', 'out');
@@ -48,9 +45,9 @@ function writeStoredAuth(obj) {
   fs.writeFileSync(AUTH_FILE, JSON.stringify({ ...obj, saved_at: new Date().toISOString() }, null, 1));
 }
 
-async function refreshTokenFrom9Router() {
+function refreshTokenFrom9Router() {
   try {
-    const { DatabaseSync } = await import('node:sqlite');
+    const { DatabaseSync } = require('node:sqlite');
     const db = new DatabaseSync(path.join(process.env.APPDATA || '', '9router', 'db', 'data.sqlite'), { readOnly: true });
     const row = db.prepare("SELECT data FROM providerConnections WHERE provider LIKE '%cline%' ORDER BY updatedAt DESC LIMIT 1").get();
     db.close();
@@ -65,7 +62,7 @@ async function refreshTokenFrom9Router() {
 
 async function refresh() {
   const stored = readStoredAuth();
-  const rt = stored?.refresh_token || process.env.CLINE_REFRESH_TOKEN || (await refreshTokenFrom9Router());
+  const rt = stored?.refresh_token || process.env.CLINE_REFRESH_TOKEN || refreshTokenFrom9Router();
   if (!rt) throw new Error('no refresh token: neither out/.cline-auth.json nor the 9Router DB has one');
   const res = await fetch(`${WORKOS_BASE}/authenticate`, {
     method: 'POST',
@@ -125,7 +122,7 @@ async function api(method, p, body) {
       console.error('  401 → refreshing account token and retrying once');
       continue;
     }
-    return { status: res.status, json, text };
+    return { status: res.status, json, text, headers: res.headers };
   }
   throw new Error('unreachable');
 }
@@ -203,13 +200,23 @@ async function cmdCreate() {
   return created;
 }
 
+function readKeyLines(file) {
+  if (!fs.existsSync(file)) return [];
+  return fs
+    .readFileSync(file, 'utf8')
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('#'))
+    .map((l) => l.split(/[\s,]+/)[0]);
+}
+
 function writeKeysFile(out, base, created, failures) {
   // Merge with what is already on disk: a later batch extends the file instead of
   // replacing it (a run that minted nothing used to wipe every key already minted).
   const keys = created.map((c) => c.key);
   const seen = new Set(keys);
   if (fs.existsSync(out)) {
-    for (const k of readKeysFile(out)) if (!seen.has(k)) { seen.add(k); keys.push(k); }
+    for (const k of readKeyLines(out)) if (!seen.has(k)) { seen.add(k); keys.push(k); }
   }
   const head = [
     `# Cline API keys · rotated ${new Date().toISOString()}`,
@@ -273,7 +280,7 @@ async function cmdVerify() {
   const retries = Number(arg('retries', '3'));
   const gap = Number(arg('delay', '0'));
   const limit = Number(arg('limit', '0')) || Infinity;
-  const keys = readKeysFile(file).slice(0, limit);
+  const keys = readKeyLines(file).slice(0, limit);
   if (!keys.length) throw new Error(`no keys in ${file}`);
   let model = arg('model');
   if (!model) {
@@ -294,7 +301,7 @@ async function cmdVerify() {
       let r = { status: 'net', err: 'not attempted', sample: '' };
       for (let attempt = 0; attempt <= retries; attempt++) {
         try { r = await chat(k, model); } catch (e) { r = { status: 'net', err: e.message, sample: '' }; }
-        if (!(r.status === 'net' || [429, 500, 502, 503, 504].includes(r.status)) || attempt === retries) break;
+        if (![429, 500, 502, 503, 504].includes(Number(r.status)) || attempt === retries) break;
         await sleep(2000 * (attempt + 1));
       }
       results[my] = { i: my + 1, prefix: k.slice(0, 16), ...r };
@@ -318,24 +325,18 @@ async function cmdVerify() {
 }
 
 async function cmdConnect() {
-  const { connectBulk } = await import('./connect-9router.js');
-  const keysFile = arg('keys', path.join(OUT_DIR, 'cline-keys.txt'));
+  const { connectKeysFile, connect9Router, defaultKeysFile } = require('./connect-9router.js');
+  const keysFile = arg('keys', defaultKeysFile());
   const router = arg('router', 'http://localhost:20128');
   const password = arg('router-password', '123456');
   const prefix = arg('prefix', 'cline');
   const model = arg('model', 'poolside/laguna-s-2.1:free');
-  
-  const { clientKey, results } = await connectBulk({
-    base: router,
-    password,
-    keysFile,
-    prefix,
-    defaultModel: model,
-  });
-  
-  console.log(`\n✅ Connected ${results.filter(r => !r.error).length} keys to 9Router`);
-  console.log(`   Endpoint: ${router}/v1`);
-  console.log(`   Client key: ${clientKey}`);
+  const opts = { base: router, password, prefix, defaultModel: model };
+  console.log(`connecting to 9Router at ${router} …`);
+  const single = arg('api-key');
+  if (single) await connect9Router({ ...opts, apiKey: single });
+  else await connectKeysFile({ ...opts, keysFile });
+  console.log(`\n✅ keys registered with 9Router as <${prefix}/model> — endpoint ${router}/v1`);
 }
 
 const HELP = `cline-bulk — bulk-create Cline API keys (workos bearer) — 9Router connector
@@ -391,10 +392,10 @@ async function run() {
   process.exitCode = 1;
 }
 
-export { cmdCreate, writeKeysFile, cmdVerify, cmdList, cmdDelete, HELP };
+module.exports = { cmdCreate, writeKeysFile, cmdVerify, cmdList, cmdDelete, HELP };
 
 // Run the CLI only when invoked directly, so examples can import the commands.
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (require.main === module) {
   run().catch((e) => {
     console.error('FATAL', e.stack || e.message);
     process.exitCode = 1;

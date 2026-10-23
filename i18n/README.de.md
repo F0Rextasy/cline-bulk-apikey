@@ -62,6 +62,15 @@ node src/cli.js connect --keys out/cline-keys.txt
 
 `create` schreibt die Key-Datei nach jeweils zehn Keys, sodass ein Absturz nie Fortschritt verliert; `verify` schreibt daneben eine `.verify.txt`-Bilanz.
 
+
+# Register them in OmniRoute
+node src/cli.js connect --keys out/cline-keys.txt
+```
+
+`create` schreibt die Key-Datei nach jeweils zehn Keys, sodass ein Absturz nie Fortschritt verliert; `verify` schreibt daneben eine `.verify.txt`-Bilanz.
+
+```
+
 ## 🛠 Verwendung
 
 ```bash

@@ -15,7 +15,7 @@
  * header). `--dry` prints exactly what would be created and writes nothing.
  */
 
-import { cmdCreate, cmdVerify } from '../src/cli.js';
+const { cmdCreate, cmdVerify } = require('../src/cli.js');
 
 const arg = (n, d) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -23,25 +23,30 @@ const arg = (n, d) => {
 };
 const flag = (n) => process.argv.includes(`--${n}`);
 
-const count = Number(arg('count', '200'));
-const prefix = arg('prefix', 'clx');
+(async () => {
+  const count = Number(arg('count', '200'));
+  const prefix = arg('prefix', 'clx');
 
-if (flag('dry')) {
-  console.log(`[dry] would create ${count} keys "${prefix}-NNN" (${prefix}-001 … ${prefix}-${String(count).padStart(3, '0')})`);
-  console.log('[dry] would write out/cline-keys.txt and out/cline-keys.jsonl.failures.json');
-  console.log('[dry] would then verify them against a free model (402 counts as accepted)');
-  console.log('[dry] nothing was created — drop --dry to mint for real');
-  process.exit(0);
-}
+  if (flag('dry')) {
+    console.log(`[dry] would create ${count} keys "${prefix}-NNN" (${prefix}-001 … ${prefix}-${String(count).padStart(3, '0')})`);
+    console.log('[dry] would write out/cline-keys.txt and out/cline-keys.jsonl.failures.json');
+    console.log('[dry] would then verify them against a free model (402 counts as accepted)');
+    console.log('[dry] nothing was created — drop --dry to mint for real');
+    process.exit(0);
+  }
 
-console.log(`Creating ${count} Cline API keys…\n`);
-const created = await cmdCreate();
+  console.log(`Creating ${count} Cline API keys…\n`);
+  const created = await cmdCreate();
 
-console.log(`\nDone! Created ${created.length} keys.`);
-console.log('Keys saved to: out/cline-keys.txt');
+  console.log(`\nDone! Created ${created.length} keys.`);
+  console.log('Keys saved to: out/cline-keys.txt');
 
-if (created.length && flag('verify')) {
-  console.log('\nVerifying…');
-  const { accepted } = await cmdVerify();
-  console.log(`Accepted ${accepted}/${created.length}`);
-}
+  if (created.length && flag('verify')) {
+    console.log('\nVerifying…');
+    const { accepted } = await cmdVerify();
+    console.log(`Accepted ${accepted}/${created.length}`);
+  }
+})().catch((e) => {
+  console.error('FATAL', e.stack || e.message);
+  process.exitCode = 1;
+});

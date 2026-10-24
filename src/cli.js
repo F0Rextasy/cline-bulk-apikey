@@ -29,6 +29,11 @@ const arg = (n, d) => {
 };
 const flag = (n) => process.argv.includes(`--${n}`);
 
+/** The WorkOS refresh token, in order of trust: a saved auth file → this flag
+ *  (whose default is the env var) → the 9Router DB. Nothing has to be exported
+ *  by hand for `auth` to work. */
+const REFRESH_TOKEN = arg('refresh-token', process.env.CLINE_REFRESH_TOKEN || '');
+
 const mask = (s) => (s ? String(s).slice(0, 12) + '…' : '(none)');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -62,8 +67,8 @@ function refreshTokenFrom9Router() {
 
 async function refresh() {
   const stored = readStoredAuth();
-  const rt = stored?.refresh_token || process.env.CLINE_REFRESH_TOKEN || refreshTokenFrom9Router();
-  if (!rt) throw new Error('no refresh token: neither out/.cline-auth.json nor the 9Router DB has one');
+  const rt = stored?.refresh_token || REFRESH_TOKEN || refreshTokenFrom9Router();
+  if (!rt) throw new Error('no refresh token: pass --refresh-token, or set CLINE_REFRESH_TOKEN, or run `cline-bulk auth` once so out/.cline-auth.json exists');
   const res = await fetch(`${WORKOS_BASE}/authenticate`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -299,16 +304,24 @@ async function cmdVerify() {
     ...results.map((r) => `${r.i}\t${r.prefix} …\t${r.status}\t${r.sample || r.err}`),
   ];
   fs.writeFileSync(out, lines.join('\n') + '\n');
-  // A key the panel refuses (401/403) is dead: it leaves the keys file and is
-  // parked in keys-dead.txt *next to the keys file*. A network blip or a 5xx is
-  // not a verdict.
-  const dead = results.filter((r) => [401, 403].includes(Number(r.status)));
+  // A key the panel refuses (401/403/410) is dead: it leaves the keys file and
+  // is parked in keys-dead.txt *next to the keys file*. A network blip, a 404,
+  // a 429 or a 5xx is not a verdict.
+  const dead = results.filter((r) => [401, 403, 410].includes(Number(r.status)));
+  // 402 is Cline's out-of-credit code and such a key still answers chat, so it
+  // is an accepted key (see `accepted`), never a dead one.
+  const deadReason = (r) => {
+    const t = String(r.err || '');
+    if (/quota|credit|insufficient|exceed/i.test(t)) return `${r.status} quota`;
+    if (/ban|suspend|disabl|forbidden|block/i.test(t)) return `${r.status} ban`;
+    return String(r.status);
+  };
   if (dead.length) {
     const raw = fs.readFileSync(file, 'utf8').split(/\r?\n/);
     const drop = new Set(dead.map((r) => r.prefix));
     fs.writeFileSync(file, raw.filter((l) => !l.trim() || !drop.has(l.trim().split(/[\s,]+/)[0].slice(0, 16))).join('\n'));
     const deadFile = path.join(path.dirname(path.resolve(file)), 'keys-dead.txt');
-    fs.appendFileSync(deadFile, dead.map((r) => `${r.key}\t${r.status}\t${new Date().toISOString()}`).join('\n') + '\n');
+    fs.appendFileSync(deadFile, dead.map((r) => `${r.key}\t${deadReason(r)}\t${new Date().toISOString()}`).join('\n') + '\n');
     console.log(`dead keys: ${dead.length} → ${path.relative(process.cwd(), deadFile)} (out of ${path.basename(file)})`);
   }
   console.log(`tally ${JSON.stringify(tally)} · accepted ${accepted}/${keys.length} → ${out}`);
@@ -363,6 +376,7 @@ Options:
   --all                with delete, target every key
   --yes                confirm a delete
   --force              force a token refresh for auth
+  --refresh-token <t>  WorkOS refresh token (default: $CLINE_REFRESH_TOKEN)
   --router <url>       9Router URL (default: http://localhost:20128)
   --router-password    9Router password (default: 123456)
   --help, -h           print this help
@@ -373,7 +387,7 @@ Keys:
 
 Environment:
   CLINE_API            Cline API base (default: https://api.cline.bot)
-  CLINE_REFRESH_TOKEN  WorkOS refresh token
+  CLINE_REFRESH_TOKEN  WorkOS refresh token (optional — same as --refresh-token)
 `;
 
 async function run() {
